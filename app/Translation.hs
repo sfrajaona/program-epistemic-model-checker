@@ -10,8 +10,9 @@ and does not use public announcement formula, since [β]α = {β?}α
 See also the companion paper here https://doi.org/10.48550/arXiv.2206.13841
 Maintainer: S.F. Rajaona sfrajaona@gmail.com
 -}
-module Translation (tau, tauSP)  where
+module Translation (tau, tauSP, mkExists)  where
 import Logics
+import qualified Data.List as L 
 import Debug.Trace 
 
 ---------------------------------
@@ -39,12 +40,14 @@ tau phi (Conj as)              = Conj [tau phi a | a <- as]
 tau phi (Disj as)              = Disj [tau phi a | a <- as]
 tau phi (Imp alpha1 alpha2)    = tau phi alpha1 ⇒ tau phi alpha2
 tau phi (Equiv alpha1 alpha2)  = (tau phi (alpha1 ⇒ alpha2)) ∧ (tau phi (alpha2 ⇒ alpha1))
+-- TODO: nonobs ag ∩ freeVars (alpha)? 
 tau phi (K ag alpha)           = mkForAll (nonobs ag) (phi ⇒ tau phi alpha)
 tau phi (KV a (NVar dom v))    = existsI dom (\z -> tau phi (K a (Atom (IVal (NVar dom v) ≡ IVal z)))) 
 tau phi (KVe a (NVar dom v))   = forAllI dom (\z -> tau phi ((Atom (IVal (NVar dom v) ≡ IVal z)) ⇒ K a (Atom (IVal (NVar dom v) ≡ IVal z))))  
 tau phi (NegKVe a (NVar dom v))= forAllI dom (\z -> tau phi (Atom (IVal (NVar dom v) ≡ IVal z) ⇒ Neg (K a (Atom (IVal (NVar dom v) ≡ IVal z)))))
 tau phi (Ann beta alpha)       = tau phi beta ⇒ tau (phi ∧ (tau phi beta)) alpha
 tau phi (Box (BAssign x e) alpha)     = forAllB (\k -> tau phi (Ann (Atom (BEq (BVal k) e)) (sub x (BVal k) alpha)))
+tau phi (Box (NAssign x e) alpha)     = forAllI (varDom x) (\k -> tau phi (Ann (Atom (Eq (IVal k) e)) (sub x (IVal k) alpha)))
 tau phi (Box (Assume beta) alpha)     = tau phi (Ann beta alpha) 
 tau phi (Box (Assert beta) alpha)     = tau phi beta ∧ tau phi (Ann beta alpha)
 tau phi (Box (Sequence [p]) alpha)    = tau phi (Box p alpha)

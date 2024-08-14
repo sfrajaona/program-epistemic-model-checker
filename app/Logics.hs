@@ -17,6 +17,7 @@ Maintainer: S.F. Rajaona sfrajaona@gmail.com
 
 module Logics where
 import Data.SBV
+import qualified Data.List as L
 import Data.Int
 import Data.Map (Map, fromList, (!))
 import Debug.Trace
@@ -35,26 +36,32 @@ data Var = BVar String | NVar IntDomain String
    deriving (Eq, Ord)
 
 type IntType = Integer
-type IntDomain = [IntType]
+type IntDomain = (IntType,IntType)
 
--- | Function 'varname' returns the name of a variable (string) 
-varname :: Var -> String
-varname (BVar a) = a
-varname (NVar d a) = a
+-- | Function 'varName' returns the name of a variable (string) 
+varName :: Var -> String
+varName (BVar a) = a
+varName (NVar d a) = a
+
+varDom :: Var -> IntDomain
+varDom (BVar a) = (0,1) 
+varDom (NVar d a) = d
 
 
 ------------------------------------------------
 -- * Expressions (boolean expressions)
 ------------------------------------------------
 data Expr a where
-    B      :: Bool -> Expr Bool        -- ^ Boolean constant 
-    BVal :: Var -> Expr Bool         -- ^ Boolean variable
-    BEq    :: Expr Bool -> Expr Bool -> Expr Bool
-    Xor    :: [Expr Bool] -> Expr Bool  
-    Or     :: [Expr Bool] -> Expr Bool
-    And    :: [Expr Bool] -> Expr Bool
+    B       :: Bool -> Expr Bool        -- ^ Boolean constant 
+    BSymb   :: SBool -> Expr Bool        -- ^ Boolean constant 
+    BVal    :: Var -> Expr Bool         -- ^ Boolean variable
+    BEq     :: Expr Bool -> Expr Bool -> Expr Bool
+    Xoor    :: [Expr Bool] -> Expr Bool  
+    Oor     :: [Expr Bool] -> Expr Bool
+    Aand    :: [Expr Bool] -> Expr Bool
 
     I      :: IntType  -> Expr Integer     
+    ISymb  :: SInteger  -> Expr Integer     
     IVal :: Var -> Expr Integer           
     Add    :: Expr Integer -> Expr Integer -> Expr Integer
     Mul    :: Expr Integer -> Expr Integer -> Expr Integer
@@ -92,6 +99,61 @@ kw ag alpha = Disj [K ag alpha, (K ag (Neg alpha))]
 data Modal
 type ModalFormula = Formula Modal
 
+
+class Varable a where
+    freeVars0 :: a -> [Var]  
+    freeVars  :: a -> [Var] 
+
+instance Varable (Formula t)
+    where
+      freeVars f = L.nub (freeVars0 f) 
+      freeVars0 (Atom b) = freeVars0 b
+      freeVars0 (Neg f) = freeVars0 f
+      freeVars0 (Conj fs) = concatMap freeVars0 fs
+      freeVars0 (Disj fs) = concatMap freeVars0 fs
+      freeVars0 (Imp f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (Equiv f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (K a f) = freeVars0 f
+      freeVars0 (KV ag v) = [v] 
+      freeVars0 (KVe ag v) = [v] 
+      freeVars0 (NegKVe ag v) = [v] 
+      freeVars0 (Ann f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (Box f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (Box' f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (ForAllB i f) = freeVars0 f
+      freeVars0 (ExistsB i f) = freeVars0 f
+      freeVars0 (ForAllI i d f) = freeVars0 f
+      freeVars0 (ExistsI i d f) = freeVars0 f
+
+instance Varable (Expr a) 
+  where
+    freeVars f = L.nub (freeVars0 f)
+    freeVars0 (B b) = []  
+    freeVars0 (BSymb b) = []  
+    freeVars0 (BVal v) = [v]  
+    freeVars0 (BEq b b') = freeVars0 b ++ freeVars0 b'
+    freeVars0 (Xoor bs) = concatMap freeVars0 bs
+    freeVars0 (Oor bs) = concatMap freeVars0 bs
+    freeVars0 (Aand bs) = concatMap freeVars0 bs
+    freeVars0 (I n) = []  
+    freeVars0 (ISymb n) = []  
+    freeVars0 (IVal v) = [v]  
+    freeVars0 (Add n n') = freeVars0 n ++ freeVars0 n'
+    freeVars0 (Mul n n') = freeVars0 n ++ freeVars0 n'
+    freeVars0 (Eq n n') = freeVars0 n ++ freeVars0 n'
+    freeVars0 (LEq n n') = freeVars0 n ++ freeVars0 n'
+
+instance Varable Prog 
+  where
+    freeVars p = L.nub (freeVars0 p)
+    freeVars0 (Assume f) = freeVars0 f 
+    freeVars0 (Assert f) = freeVars0 f 
+    freeVars0 (BAssign v e) = v:freeVars0 e 
+    freeVars0 (NAssign v e) = v:freeVars0 e 
+    freeVars0 (Sequence ps) = concatMap freeVars0 ps
+    freeVars0 (Nondet ps) = concatMap freeVars0 ps
+    
+
 -- | Shotcuts
 (∨) f g = Disj [f,g]  
 (∧) f g = Conj [f,g]  
@@ -105,7 +167,7 @@ false = Atom (B False)
 (≤) m n = LEq m n
 (⨰) m n = Mul m n 
 (∔) m n = Add m n
-(⊕) f g = Xor [f, g] 
+(⊕) f g = Xoor [f, g] 
 
 ----------------------------------------------------------------------------
 -- * Mechanism for dealing with quanitifiers
@@ -226,6 +288,7 @@ data Prog
     = Assume ModalFormula
     | Assert ModalFormula
     | BAssign Var BExpr 
+    | NAssign Var NExpr 
     | Sequence [Prog]
     | Nondet [Prog]
 
@@ -236,6 +299,7 @@ sp :: ModalFormula -> Prog -> ModalFormula
 sp phi (Assume beta)       = beta ∧ phi
 sp phi (Assert beta)       = beta ⇒ phi
 sp phi (BAssign v e)     = existsB (\y -> Conj [Atom (BEq (BVal v) (subBExpr v (BVal y) e)), sub v (BVal y) phi])  
+sp phi (NAssign v e)     = existsI (varDom v) (\y -> Conj [Atom (Eq (IVal v) (subNExpr v (IVal y) e)), sub v (IVal y) phi])  
 sp phi (Sequence [])     = phi
 sp phi (Sequence [p])    = sp phi p
 sp phi (Sequence (p:ps)) = sp (sp phi p) (Sequence ps)
@@ -250,6 +314,7 @@ wp :: ModalFormula -> Prog -> ModalFormula
 wp alpha (Assume beta)           = Ann beta alpha
 wp alpha (Assert beta)           = beta ∧ Ann beta alpha
 wp alpha (BAssign v e)           = forAllB (\k -> (Ann (Atom (BEq (BVal k) e)) (sub v (BVal k) alpha)))
+wp alpha (NAssign v e)           = forAllI (varDom v) (\k -> (Ann (Atom (Eq (IVal k) e)) (sub v (IVal k) alpha)))
 wp alpha (Sequence [])           = alpha
 wp alpha (Sequence (p:ps))       = wp (wp alpha (Sequence ps)) p
 wp alpha (Nondet ps)             = Conj [wp alpha p | p <- ps]
@@ -261,33 +326,37 @@ wp alpha (Nondet ps)             = Conj [wp alpha p | p <- ps]
 -- to make the substitution
 sub :: Var -> Expr a -> Formula b -> Formula b
 sub x (I i) f      = subNum x (I i) f
+sub x (ISymb i) f  = subNum x (ISymb i) f
 sub x (IVal y) f = subNum x (IVal y) f
 sub x (Add a b) f  = subNum x (Add a b) f
 sub x (Mul a b) f  = subNum x (Mul a b) f
 sub x (Eq a b) f   = subBool x (Eq a b) f
 sub x (LEq a b) f  = subBool x (LEq a b) f
 sub x (B b) f      = subBool x (B b) f
+sub x (BSymb z) f  = subBool x (BSymb z) f
 sub x (BVal p) f = subBool x (BVal p) f
-sub x (Xor bs) f   = subBool x (Xor bs) f
-sub x (And bs) f   = subBool x (And bs) f
-sub x (Or bs) f    = subBool x (Or bs) f
+sub x (Xoor bs) f   = subBool x (Xoor bs) f
+sub x (Aand bs) f   = subBool x (Aand bs) f
+sub x (Oor bs) f    = subBool x (Oor bs) f
 
 -- | 'subNExpr'  propagates a substitution inside a numerical/integer expression
 subNExpr :: Var -> NExpr -> NExpr -> NExpr
 subNExpr x e (Add a b)               = Add (subNExpr x e a)  (subNExpr x e b)
 subNExpr x e (Mul a b)               = Mul (subNExpr x e a)  (subNExpr x e b)
 subNExpr x e (I i)                   = I i
+subNExpr x e (ISymb i)               = ISymb i
 subNExpr x e (IVal y) | x == y     = e
 subNExpr x e (IVal y) | otherwise  = IVal y
 
 -- | 'subBExpr' propagates a substitution inside a boolean expression
 subBExpr :: Var -> BExpr -> BExpr -> BExpr
 subBExpr x e (B b)                   = B b
+subBExpr x e (BSymb b)                   = BSymb b
 subBExpr x e (BVal z) | x == z     = e
 subBExpr x e (BVal z) | otherwise  = BVal z
-subBExpr x e (Xor bs)                = Xor [subBExpr x e b | b <- bs]
-subBExpr x e (And bs)                = And [subBExpr x e b | b <- bs]
-subBExpr x e (Or bs)                 = Or [subBExpr x e b | b <- bs]
+subBExpr x e (Xoor bs)                = Xoor [subBExpr x e b | b <- bs]
+subBExpr x e (Aand bs)                = Aand [subBExpr x e b | b <- bs]
+subBExpr x e (Oor bs)                 = Oor [subBExpr x e b | b <- bs]
 subBExpr x e (Eq m n)                = Eq m n
 subBExpr x e (LEq m n)               = LEq m n
 subBExpr x e (BEq p q)               = BEq (subBExpr x e p) (subBExpr x e q)  
@@ -314,9 +383,9 @@ subNum x e (Atom (Eq m n))   = Atom (Eq (subNExpr x e m)  (subNExpr x e n))
 subNum x e (Atom (LEq m n))  = Atom (LEq (subNExpr x e m)  (subNExpr x e n))
 subNum x e (Atom (BVal z)) = Atom (BVal z)
 subNum x e (Atom (B b))      = Atom (B b)
-subNum x e (Atom (Xor bs))   = Atom (Xor bs)
-subNum x e (Atom (And bs))   = Atom (And bs)
-subNum x e (Atom (Or bs))    = Atom (Or bs)
+subNum x e (Atom (Xoor bs))   = Atom (Xoor bs)
+subNum x e (Atom (Aand bs))   = Atom (Aand bs)
+subNum x e (Atom (Oor bs))    = Atom (Oor bs)
 subNum x e (Neg f)           = Neg (subNum x e f)
 subNum x e (Conj fs)         = Conj [subNum x e f | f <- fs]
 subNum x e (Disj fs)         = Disj [subNum x e f | f <- fs]
@@ -346,11 +415,12 @@ instance Show (Expr a) where
   show (BEq p q) = show p ++ "==" ++ show q
   show (B True) = "T"
   show (B False) = "F"
-  show (Xor bs) = "allXor([" ++ separateWithCommas [show b | b <- bs]  ++ "])"
-  show (Or [b]) = show b
-  show (Or (b:bs)) = show b ++ "∨" ++ show (Or bs) 
-  show (And [b]) = show b
-  show (And (b:bs)) = show b ++ "∧" ++ show (And bs) 
+  show (Xoor bs) = "allXoor([" ++ separateWithCommas [show b | b <- bs]  ++ "])"
+  show (Oor [b]) = show b
+  show (Oor (b:bs)) = show b ++ "∨" ++ show (Oor bs) 
+
+  show (Aand [b]) = show b
+  show (Aand (b:bs)) = show b ++ "∧" ++ show (Aand bs) 
   show (I a) = show a
   show (IVal a) = show a
   show (Eq m n) = show m ++ "==" ++ show n
@@ -363,6 +433,7 @@ instance Show Prog where
   show (Assume f) = (toString f) ++ "?"
   show (Assert f) = (toString f) ++ "!"
   show (BAssign v e) = show v ++ ":=" ++ show e
+  show (NAssign v e) = show v ++ ":=" ++ show e
   show (Sequence []) = ""
   show (Sequence [p]) = show p
   show (Sequence (p:ps)) = show p ++ ";" ++ show (Sequence ps) 
@@ -402,7 +473,7 @@ toPyStringPrec dCntxt f = bracket unbracketed where
     unbracketed = case f of
         Atom (B t)    -> show t
         Atom (BVal (BVar b))    -> b 
-        Atom (Xor (bs))  -> "allXor([" ++ separateWithCommas [recurse (Atom b) | b <- bs]  ++ "])"
+        Atom (Xoor (bs))  -> "allXoor([" ++ separateWithCommas [recurse (Atom b) | b <- bs]  ++ "])"
         Atom e -> show e
         K ag p   -> "K_" ++ (identity ag) ++ " " ++ recurse p
         Ann f g   -> "[" ++ recurse f ++ "]" ++ recurse g
@@ -431,7 +502,7 @@ toStringPrec dCntxt f = bracket unbracketed where
     unbracketed = case f of
         Atom (B t)    -> show t
         Atom (BVal (BVar b))    -> b 
-        Atom (Xor (bs))  -> "allXor([" ++ separateWithCommas [recurse (Atom b) | b <- bs]  ++ "])"
+        Atom (Xoor (bs))  -> "allXoor([" ++ separateWithCommas [recurse (Atom b) | b <- bs]  ++ "])"
         Atom e -> show e
         K ag p   -> "K_" ++ (identity ag) ++ " " ++ recurse p
         Ann f g   -> "[" ++ recurse f ++ "]" ++ recurse g
@@ -447,8 +518,8 @@ toStringPrec dCntxt f = bracket unbracketed where
         Box prog q -> "{" ++ (show prog) ++ "}" ++ recurse q
         ExistsB b f -> "∃yb" ++ show b ++ "⋅"++ recurse f
         ForAllB b f -> "∀ub" ++ show b ++ "⋅"++ recurse f
-        ExistsI b d f -> "∃yi" ++ show b ++ "⋅"++ recurse f
-        ForAllI b d f -> "∀ui" ++ show b ++ "⋅"++ recurse f
+        ExistsI b d f -> "∃XI[" ++ show b ++ "]⋅"++ recurse f
+        ForAllI b d f -> "∀UI[" ++ show b ++ "]⋅"++ recurse f
     bracket
         | dCntxt > dHere = \s -> "(" ++ s ++ ")"
         | otherwise      = id

@@ -68,8 +68,10 @@ writeForm  = writeFile "cherylsBirthday.py" (show uivarBound ++ "\n" ++ show xiv
 -- ===========================================================================
 -- the solution with SBV requires transforming quantifiers into bounded conjunctions
 -- hence we define the domain of the variables
-monthDom = [5,6,7,8,9,10]       --  could be 1 to 12, smaller domain for performance
-dayDom = [14,15,16,17,18,19,21] --  could be 1 to 31
+-- monthDom = [5,6,7,8,9,10]       --  could be 1 to 12, smaller domain for performance
+monthDom = (1,12)       --  could be 1 to 12, smaller domain for performance
+-- dayDom = [14,15,16,17,18,19,21] --  could be 1 to 31
+dayDom = (1,31) --  could be 1 to 31
 
 
 -- USAGE
