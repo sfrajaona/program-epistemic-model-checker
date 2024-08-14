@@ -289,6 +289,7 @@ data Prog
     | Assert ModalFormula
     | BAssign Var BExpr 
     | NAssign Var NExpr 
+    | New Var Prog
     | Sequence [Prog]
     | Nondet [Prog]
 
@@ -313,6 +314,7 @@ sp phi (Nondet ps)       = Disj [sp phi p | p <- ps]
 wp :: ModalFormula -> Prog -> ModalFormula
 wp alpha (Assume beta)           = Ann beta alpha
 wp alpha (Assert beta)           = beta ∧ Ann beta alpha
+wp alpha (New (NVar d v) prog)   = forAllI d (\k -> (sub (NVar d v) (IVal k) (wp alpha prog)))
 wp alpha (BAssign v e)           = forAllB (\k -> (Ann (Atom (BEq (BVal k) e)) (sub v (BVal k) alpha)))
 wp alpha (NAssign v e)           = forAllI (varDom v) (\k -> (Ann (Atom (Eq (IVal k) e)) (sub v (IVal k) alpha)))
 wp alpha (Sequence [])           = alpha
