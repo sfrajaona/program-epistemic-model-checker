@@ -6,4 +6,4 @@ import ExamplePit
 import Logics 
 
 -- main :: IO ()
-main = mrSmrP
+main = cherylsBirthday
