@@ -13,33 +13,29 @@ import ToSBV
 --------------------------
 -- TODO IMPORTANT: variable are 
 a :: Agent 
-a = Agent {identity = "a", nonobs = [m,n,rb,lb,rc,lc]  } 
+a = Agent "a"
 b :: Agent 
-b = Agent {identity = "b", nonobs = [m,n,ra,la,rc,lc]  } 
+b = Agent "b"
 c :: Agent 
-c = Agent {identity = "c", nonobs = [m,n,ra,la,rb,lb]  } 
+c = Agent "c"
 
-cardDom = (2,5) 
+cardDom = (2,5)  -- the bounds of the domain
 
 la :: Var
-la = NVar cardDom ("la")
+la = NVar [b,c] cardDom ("la")
 ra :: Var
-ra = NVar cardDom ("ra")
+ra = NVar [b,c] cardDom ("ra")
 
 lb :: Var
-lb = NVar cardDom ("lb")
+lb = NVar [a,c] cardDom ("lb")
 rb :: Var
-rb = NVar cardDom ("rb")
+rb = NVar [a,c] cardDom ("rb")
 
 lc :: Var
-lc = NVar cardDom ("lc")
+lc = NVar [a,b] cardDom ("lc")
 rc :: Var
-rc = NVar cardDom ("rc")
+rc = NVar [a,b] cardDom ("rc")
 
-n :: Var
-n = NVar cardDom ("n")
-m :: Var
-m = NVar cardDom ("m")
 
 
 -----------------------------------------------------
@@ -83,8 +79,8 @@ phi = Conj [
 --------------------------------
 -- we define the functions pitSat and pitProve to performs simple tests
 --
-pitSat α = sat $ toSBV [la,ra,lb,rb,lc,rc,m,n] phi (tau phi α)
-pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc,m,n] phi (tau phi α)
+pitSat α = sat $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
+pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 
 ------------ USAGE in GHCI ---------------
 -- Make sure you have installed SBV.
@@ -93,7 +89,7 @@ pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc,m,n] phi (tau phi α)
 --------------------------------
 
 ---------------------------------
--- >>> pitSat $ KV a n
+-- >>> pitSat $ KV a rb
 -- Unsatisfiable
 --
 ----------------------------------
@@ -109,18 +105,31 @@ pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc,m,n] phi (tau phi α)
 --  rb = 2 :: Integer
 --  lc = 3 :: Integer
 --  rc = 2 :: Integer
---  m  = 0 :: Integer
---  n  = 0 :: Integer
 ---------------------------------
   
 ---------------------------------
 -- ACTIONs
 ---------------------------------
-swap1 = NAssign la (I 2) 
-alpha1 = Box swap1 (Atom (IVal la ≡ IVal ra)) 
-wp1 = wp (Atom (IVal la ≡ IVal ra)) swap1
+-- not a real swap DEBUGGING
+-- swap1 = NAssign la (I 2) 
+-- wp11 = wp (Atom (IVal la ≡ IVal ra)) swap1
+-- wp12 = wp (K b $ Atom (IVal la ≡ IVal ra)) swap1
 
-swap2 = Sequence [NAssign n (IVal la), NAssign lb (IVal n)]
-alpha2 = Box swap2 (Atom (IVal lb ≡ IVal rb)) 
+
+-- alpha11 = Box swap1 (Atom (IVal la ≡ IVal ra)) 
+-- alpha12 = Box swap1 (K b (Atom (IVal la ≡ IVal ra)))
+-- alpha13 = Box swap1 (K a (Atom (IVal la ≡ IVal ra)))
+
+-- the real swap
+n = NVar [a,b,c] cardDom "n"
+swap2 = Sequence [New n (NAssign n (IVal la)), NAssign lb (IVal n)]
 wp2 = wp (Atom (IVal la ≡ IVal ra)) swap2
+
+alpha21 = Box swap2 (Atom (IVal lb ≡ IVal rb)) 
+alpha22 = Box swap2 (K a (Atom (IVal lb ≡ IVal rb))) 
+alpha23 = Box swap2 (K b (Atom (IVal lb ≡ IVal rb))) 
+
+alpha24 = Box swap2 (KV a lb) 
+
+
 

@@ -24,11 +24,16 @@ import Data.Maybe
 
 -- | @ag i@ characterised by its identity @i@ and its nonobservable variables
 ag :: Int -> Agent
-ag i = Agent {identity= show i, nonobs=(allVars\\(obs i))} 
+ag i = Agent (show i)
+-- ag i = Agent {identity= show i, nonobs=(allVars\\(obs i))} 
 
 -- | all variables
 allVars :: [Var]
 allVars = [varx] ++ concat [[varc i, varp i] | i <- [0 .. (n-1)]] 
+
+-- | all agents
+allAgents :: [Agent]
+allAgents = [ag i | i <- [0 .. (n-1)]]
 
 -- | observability function, \(ag_i\) observes \(x, p_i, c_i, c_{i+1 \mod n}\), 
 obs :: Int -> [Var]
@@ -36,7 +41,7 @@ obs i = [varx, varp i, varc i, varc $ (i+1) `mod` n]
 
 -- | boolean variable \(x\)
 varx :: Var
-varx = BVar "x" 
+varx = BVar [] "x"  -- observable to all
 
 -- | boolean expression x
 x :: BExpr
@@ -44,11 +49,11 @@ x = BVal varx
 
 -- | boolean variable \(c_i\) coin flip between agent i and agent i-1
 varc :: Int -> Var
-varc i = BVar ("c" ++ show i) 
+varc i = BVar (allAgents\\[ag i, ag (i+1 `mod` n) ]) ("c" ++ show i) 
 
 -- | boolean variable \(p_i\) agent i paid
 varp :: Int -> Var
-varp i = BVar ("p" ++ show i) 
+varp i = BVar (allAgents\\[ag i]) ("p" ++ show i) 
 
 -- | boolean expression \(p_i\)
 p :: Int -> BExpr
@@ -73,7 +78,7 @@ progDC = BAssign varx bexprDC
 
 -- | the number of agents
 n :: Int 
-n = 100 
+n = 10 
 
 noonepaid :: ModalFormula 
 noonepaid = Conj [Neg (Atom (p i)) | i <- [0 .. (n-1)]]

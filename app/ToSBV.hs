@@ -28,10 +28,10 @@ import Translation
 -- The target formula is usually the translation of a 'ModalFormula' \(\tau(\ldots)\) via the "Tau" module.
 -- Both formulas are converted into SBV formula. Variables are converted into SBV symbolic variables
 toSBV :: [Var] -> ModalFormula -> ModalFormula -> Predicate
-toSBV vs phi formula = do freeBools      <- symbolics [varName (BVar x)  | (BVar x)  <- vs] 
-                          freeInts       <- symbolics [varName (NVar d x)  | (NVar d x)  <- vs] 
-                          let toFreeBool = fromList $ zip [(BVar x)  | (BVar x)  <- vs] freeBools
-                          let toFreeInt  = fromList $ zip [(NVar d x)  | (NVar d x)  <- vs] freeInts
+toSBV vs phi formula = do freeBools      <- symbolics [varName (BVar ags x)  | (BVar ags x)  <- vs] 
+                          freeInts       <- symbolics [varName (NVar ags d x)  | (NVar ags d x)  <- vs] 
+                          let toFreeBool = fromList $ zip [(BVar ags x)  | (BVar ags x)  <- vs] freeBools
+                          let toFreeInt  = fromList $ zip [(NVar ags d x)  | (NVar ags d x)  <- vs] freeInts
                           constrain      $ toSymb (toFreeBool, toFreeInt) phi
                           return         $ toSymb (toFreeBool, toFreeInt) formula
                                     
@@ -49,14 +49,14 @@ toSymb ff (Imp alpha1 alpha2)   = (toSymb ff alpha1) .=>  (toSymb ff alpha2)
 toSymb ff (Equiv alpha1 alpha2) = (toSymb ff alpha1) .<=> (toSymb ff alpha2)
 -- toSymb ff (ForAllB n f)         = sAll (\z -> toSymb ff (sub (uBVar n) (B z) f)) [True, False]
 -- toSymb ff (ExistsB n f)         = sAny (\z -> toSymb ff (sub (eBVar n) (B z) f)) [True, False]
-toSymb ff (ForAllB n f)         = quantifiedBool (\(Forall z) -> (toSymb ff (sub (uBVar n) (BSymb z) f)))
-toSymb ff (ExistsB n f)         = quantifiedBool (\(Exists z) -> (toSymb ff (sub (eBVar n) (BSymb z) f)))
+toSymb ff (ForAllB n ags f)         = quantifiedBool (\(Forall z) -> (toSymb ff (sub (uBVar n ags) (BSymb z) f)))
+toSymb ff (ExistsB n ags f)         = quantifiedBool (\(Exists z) -> (toSymb ff (sub (eBVar n ags) (BSymb z) f)))
 -- toSymb ff (ForAllI n d f)       = sAll (\z -> toSymb ff (sub (uIVar n d) (I z) f)) [(fst d)..(snd d)] 
 -- toSymb ff (ExistsI n d f)       = sAny (\z -> toSymb ff (sub (eIVar n d) (I z) f)) [(fst d)..(snd d)]
 -- toSymb ff (ForAllI n d f)    = skolemize $ quantifiedBool (\(Forall z) -> (z .< literal (snd d) .&& literal (fst d) .< z) .=>  (toSymb ff (sub (uIVar n d) (ISymb z) f)))
 -- toSymb ff (ExistsI n d f)    = skolemize $ quantifiedBool (\(Exists z) -> (z .< literal (snd d) .&& literal (fst d) .< z) .&&  (toSymb ff (sub (eIVar n d) (ISymb z) f)))
-toSymb ff (ForAllI n d f)    = quantifiedBool (\(Forall z) -> (toSymb ff (sub (uIVar n d) (ISymb z) f)))
-toSymb ff (ExistsI n d f)    = quantifiedBool (\(Exists z) -> (toSymb ff (sub (eIVar n d) (ISymb z) f)))
+toSymb ff (ForAllI n ags d f)    = quantifiedBool (\(Forall z) -> (toSymb ff (sub (uIVar n ags d) (ISymb z) f)))
+toSymb ff (ExistsI n ags d f)    = quantifiedBool (\(Exists z) -> (toSymb ff (sub (eIVar n ags d) (ISymb z) f)))
 
 -- | toSymbBExpr: 
 -- convert a boolean expression in BExpr into SBV SBool. 

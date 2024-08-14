@@ -15,10 +15,10 @@ import Data.SBV
 --------------------------
 -- AGENTS and VARIABLES --
 --------------------------
-albert  = Agent {identity = "Albert", nonobs = [day]  } 
-bernard = Agent {identity = "Bernard", nonobs = [month] } 
-month   = NVar monthDom ("month")
-day     = NVar dayDom ("day")
+albert  = Agent "Albert" 
+bernard = Agent "Bernard" 
+month   = NVar [bernard] monthDom ("month")
+day     = NVar [albert] dayDom ("day")
 
 
 --------------------

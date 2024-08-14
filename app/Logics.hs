@@ -26,13 +26,17 @@ import Debug.Trace
 -- * Agents and Variables
 --------------------------
 -- | an 'Agent' is determined by its identity and the set of nonobservable variables
-data Agent = Agent {identity :: String, nonobs :: [Var]}
+data Agent = Agent String
    deriving (Eq, Ord)
+
+instance Show Agent
+  where
+    show (Agent a) = a
 
 -- | variables are string, we give a domain for integer variables
 -- the domain is necessarily only if using SBV, in which quantifications
 -- are transformed into conjunctions/disjunctions
-data Var = BVar String | NVar IntDomain String
+data Var = BVar [Agent] String | NVar [Agent] IntDomain String
    deriving (Eq, Ord)
 
 type IntType = Integer
@@ -40,13 +44,19 @@ type IntDomain = (IntType,IntType)
 
 -- | Function 'varName' returns the name of a variable (string) 
 varName :: Var -> String
-varName (BVar a) = a
-varName (NVar d a) = a
+varName (BVar ags a) = a
+varName (NVar ags d a) = a
 
 varDom :: Var -> IntDomain
-varDom (BVar a) = (0,1) 
-varDom (NVar d a) = d
+varDom (BVar ags a) = (0,1) 
+varDom (NVar ags d a) = d
 
+nonObservers :: Var -> [Agent] 
+nonObservers (BVar ags _) = ags 
+nonObservers (NVar ags _ _) = ags 
+
+nonObs :: Agent -> ModalFormula -> [Var] 
+nonObs a phi =  (L.nub [v | v <- freeVars phi, a `elem` nonObservers v]) 
 
 ------------------------------------------------
 -- * Expressions (boolean expressions)
@@ -88,10 +98,10 @@ data Formula t where
    Ann       :: Formula Modal -> Formula Modal -> Formula Modal
    Box       :: Prog -> Formula Modal -> Formula Modal
    Box'      :: Prog -> Formula Modal -> Formula Modal
-   ForAllB   :: Int -> Formula Modal -> Formula Modal 
-   ExistsB   :: Int -> Formula Modal -> Formula Modal 
-   ForAllI   :: Int -> IntDomain -> Formula Modal -> Formula Modal 
-   ExistsI   :: Int -> IntDomain -> Formula Modal -> Formula Modal 
+   ForAllB   :: Int -> [Agent] -> Formula Modal -> Formula Modal 
+   ExistsB   :: Int -> [Agent] -> Formula Modal -> Formula Modal 
+   ForAllI   :: Int -> [Agent] -> IntDomain -> Formula Modal -> Formula Modal 
+   ExistsI   :: Int -> [Agent] -> IntDomain -> Formula Modal -> Formula Modal 
 
 kw :: Agent -> ModalFormula -> ModalFormula
 kw ag alpha = Disj [K ag alpha, (K ag (Neg alpha))]
@@ -120,10 +130,10 @@ instance Varable (Formula t)
       freeVars0 (Ann f g) = freeVars0 f ++ freeVars0 g
       freeVars0 (Box f g) = freeVars0 f ++ freeVars0 g
       freeVars0 (Box' f g) = freeVars0 f ++ freeVars0 g
-      freeVars0 (ForAllB i f) = freeVars0 f
-      freeVars0 (ExistsB i f) = freeVars0 f
-      freeVars0 (ForAllI i d f) = freeVars0 f
-      freeVars0 (ExistsI i d f) = freeVars0 f
+      freeVars0 (ForAllB i ags f) = freeVars0 f
+      freeVars0 (ExistsB i ags f) = freeVars0 f
+      freeVars0 (ForAllI i ags d f) = freeVars0 f
+      freeVars0 (ExistsI i ags d f) = freeVars0 f
 
 instance Varable (Expr a) 
   where
@@ -174,45 +184,45 @@ false = Atom (B False)
 ----------------------------------------------------------------------------
 
 -- | 'eBVar' constructs an existential boolean variable \(xb_i\) for an integer i 
-eBVar :: Int -> Var
-eBVar n = BVar ("XB[" ++ show n ++"]")
+eBVar :: Int -> [Agent] -> Var
+eBVar n ags = BVar ags  ("XB[" ++ show n ++"]")
 
 -- | 'uBVar' constructs an universal boolean variable \(ub_i\) for an integer i 
-uBVar :: Int -> Var
-uBVar n = BVar ("UB[" ++ show n ++"]")
+uBVar :: Int -> [Agent] -> Var
+uBVar n ags = BVar ags ("UB[" ++ show n ++"]")
 
 -- | 'eBVar' constructs an existential integer variable \(xi_i\) for an integer i 
-eIVar :: Int -> IntDomain -> Var
-eIVar n d = NVar d ("XI[" ++ show n ++ "]")
+eIVar :: Int -> [Agent] -> IntDomain -> Var
+eIVar n ags d = NVar ags d ("XI[" ++ show n ++ "]")
 
 -- | 'uBVar' constructs an universal integer variable \(ui_i\) for an integer i 
-uIVar :: Int -> IntDomain -> Var
-uIVar n d = NVar d ("UI[" ++ show n ++ "]")
+uIVar :: Int -> [Agent] -> IntDomain -> Var
+uIVar n ags d = NVar ags d ("UI[" ++ show n ++ "]")
 
 -- | this function chooses an appropriate index \(i\) 
 -- to build universal quantification \(\exists y_i \ldots\)
 -- from of a lambda abstracted 'ModalFormula'.
-forAllB :: (Var -> Formula Modal) -> Formula Modal
-forAllB f = ForAllB n body
-  where body = f (uBVar n)
+forAllB :: [Agent] -> (Var -> Formula Modal) -> Formula Modal
+forAllB ags f = ForAllB n ags body
+  where body = f (uBVar n ags)
         n    = (maxUBV body + 1)
 
 -- | similar to 'forAllB' but with existential 
-existsB :: (Var -> Formula Modal) -> Formula Modal
-existsB f = ExistsB n body
-  where body = f (eBVar n)
+existsB :: [Agent] -> (Var -> Formula Modal) -> Formula Modal
+existsB ags f = ExistsB n ags body
+  where body = f (eBVar n ags)
         n    = maxEBV body + 1
 
 -- | similar to 'forAllB' but for variables on other domains 
-forAllI :: IntDomain -> (Var ->  Formula Modal) -> Formula Modal
-forAllI dom f = ForAllI n dom body
-  where body = f (uIVar n dom)
+forAllI :: [Agent] -> IntDomain -> (Var ->  Formula Modal) -> Formula Modal
+forAllI ags dom f = ForAllI n ags dom body
+  where body = f (uIVar n ags dom)
         n    = (maxUIBV body + 1)
 
 -- | similar to 'existsB' but for non-bool domains
-existsI :: IntDomain -> (Var -> Formula Modal) -> Formula Modal
-existsI dom f = ExistsI n dom body
-  where body = f (eIVar n dom)
+existsI :: [Agent] -> IntDomain -> (Var -> Formula Modal) -> Formula Modal
+existsI ags dom f = ExistsI n ags dom body
+  where body = f (eIVar n ags dom)
         n    = maxEIBV body + 1
 
 -- Computes the maximum index of bound variables
@@ -223,10 +233,10 @@ maxEBV (Conj fs)  = maximum [maxEBV f | f <- fs]
 maxEBV (Disj fs)  = maximum [maxEBV f | f <- fs]
 maxEBV (Imp f g)  = maximum [maxEBV f, maxEBV g]
 maxEBV (Equiv f g)  = maximum [maxEBV f, maxEBV g]
-maxEBV (ExistsB n f) = n
-maxEBV (ForAllB n f) = maxEBV f
-maxEBV (ExistsI n d f) = maxEBV f
-maxEBV (ForAllI n d f) = maxEBV f
+maxEBV (ExistsB n ags f) = n
+maxEBV (ForAllB n ags f) = maxEBV f
+maxEBV (ExistsI n ags d f) = maxEBV f
+maxEBV (ForAllI n ags d f) = maxEBV f
 maxEBV (K ag f) = maxEBV f 
 maxEBV (KV ag v) = 0 
 maxEBV (Ann f g) = maxEBV f `max` maxEBV g
@@ -239,10 +249,10 @@ maxUBV (Conj fs)  = maximum [maxUBV f | f <- fs]
 maxUBV (Disj fs)  = maximum [maxUBV f | f <- fs]
 maxUBV (Imp f g)  = maximum [maxUBV f, maxUBV g]
 maxUBV (Equiv f g)  = maximum [maxUBV f, maxUBV g]
-maxUBV (ExistsB n f) = maxUBV f
-maxUBV (ForAllB n f) = n
-maxUBV (ExistsI n d f) = maxUBV f
-maxUBV (ForAllI n d f) = maxUBV f
+maxUBV (ExistsB n ags f) = maxUBV f
+maxUBV (ForAllB n ags f) = n
+maxUBV (ExistsI n ags d f) = maxUBV f
+maxUBV (ForAllI n ags d f) = maxUBV f
 maxUBV (K ag f) = maxUBV f 
 maxUBV (KV ag v) = 0 
 maxUBV (Ann f g) = maxUBV f `max` maxUBV g
@@ -256,10 +266,10 @@ maxEIBV (Conj fs)  = maximum [maxEIBV f | f <- fs]
 maxEIBV (Disj fs)  = maximum [maxEIBV f | f <- fs]
 maxEIBV (Imp f g)  = maximum [maxEIBV f, maxEIBV g]
 maxEIBV (Equiv f g)  = maximum [maxEIBV f, maxEIBV g]
-maxEIBV (ExistsB n f) = maxEIBV f
-maxEIBV (ForAllB n f) = maxEIBV f
-maxEIBV (ExistsI n d f) = n
-maxEIBV (ForAllI n d f) = maxEIBV f
+maxEIBV (ExistsB n ags f) = maxEIBV f
+maxEIBV (ForAllB n ags f) = maxEIBV f
+maxEIBV (ExistsI n ags d f) = n
+maxEIBV (ForAllI n ags d f) = maxEIBV f
 maxEIBV (K ag f) = maxEIBV f 
 maxEIBV (KV ag v) = 0 
 maxEIBV (Ann f g) = maxEIBV f `max` maxEIBV g
@@ -272,10 +282,10 @@ maxUIBV (Conj fs)  = maximum [maxUIBV f | f <- fs]
 maxUIBV (Disj fs)  = maximum [maxUIBV f | f <- fs]
 maxUIBV (Imp f g)  = maximum [maxUIBV f, maxUIBV g]
 maxUIBV (Equiv f g)  = maximum [maxUIBV f, maxUIBV g]
-maxUIBV (ExistsB n f) = maxUIBV f
-maxUIBV (ForAllB n f) = maxUIBV f
-maxUIBV (ExistsI n d f) = maxUIBV f
-maxUIBV (ForAllI n d f) = n
+maxUIBV (ExistsB n ags f) = maxUIBV f
+maxUIBV (ForAllB n ags f) = maxUIBV f
+maxUIBV (ExistsI n ags d f) = maxUIBV f
+maxUIBV (ForAllI n ags d f) = n
 maxUIBV (K ag f) = maxUIBV f 
 maxUIBV (KV ag v) = 0 
 maxUIBV (Ann f g) = maxUIBV f `max` maxUIBV g
@@ -289,7 +299,7 @@ data Prog
     | Assert ModalFormula
     | BAssign Var BExpr 
     | NAssign Var NExpr 
-    | New Var Prog
+    | New Var Prog 
     | Sequence [Prog]
     | Nondet [Prog]
 
@@ -297,10 +307,11 @@ data Prog
 -- * Strongest Precondition for comparing with IJCAI'17 paper
 ----------------------------
 sp :: ModalFormula -> Prog -> ModalFormula
+-- TODO add sp for new
 sp phi (Assume beta)       = beta ∧ phi
 sp phi (Assert beta)       = beta ⇒ phi
-sp phi (BAssign v e)     = existsB (\y -> Conj [Atom (BEq (BVal v) (subBExpr v (BVal y) e)), sub v (BVal y) phi])  
-sp phi (NAssign v e)     = existsI (varDom v) (\y -> Conj [Atom (Eq (IVal v) (subNExpr v (IVal y) e)), sub v (IVal y) phi])  
+sp phi (BAssign v e)     = existsB (nonObservers v) (\y -> Conj [Atom (BEq (BVal v) (subBExpr v (BVal y) e)), sub v (BVal y) phi])  
+sp phi (NAssign v e)     = existsI (nonObservers v) (varDom v) (\y -> Conj [Atom (Eq (IVal v) (subNExpr v (IVal y) e)), sub v (IVal y) phi])  
 sp phi (Sequence [])     = phi
 sp phi (Sequence [p])    = sp phi p
 sp phi (Sequence (p:ps)) = sp (sp phi p) (Sequence ps)
@@ -314,9 +325,10 @@ sp phi (Nondet ps)       = Disj [sp phi p | p <- ps]
 wp :: ModalFormula -> Prog -> ModalFormula
 wp alpha (Assume beta)           = Ann beta alpha
 wp alpha (Assert beta)           = beta ∧ Ann beta alpha
-wp alpha (New (NVar d v) prog)   = forAllI d (\k -> (sub (NVar d v) (IVal k) (wp alpha prog)))
-wp alpha (BAssign v e)           = forAllB (\k -> (Ann (Atom (BEq (BVal k) e)) (sub v (BVal k) alpha)))
-wp alpha (NAssign v e)           = forAllI (varDom v) (\k -> (Ann (Atom (Eq (IVal k) e)) (sub v (IVal k) alpha)))
+wp alpha (New (NVar ags d v) prog)   = forAllI ags d (\k -> (sub (NVar ags d v) (IVal k) (wp alpha prog)))
+wp alpha (New (BVar ags v) prog)   = forAllB ags (\k -> (sub (BVar ags v) (BVal k) (wp alpha prog)))
+wp alpha (BAssign v e)           = forAllB (nonObservers v) (\k -> (Ann (Atom (BEq (BVal k) e)) (sub v (BVal k) alpha)))
+wp alpha (NAssign v e)           = forAllI (nonObservers v) (varDom v) (\k -> (Ann (Atom (Eq (IVal k) e)) (sub v (IVal k) alpha)))
 wp alpha (Sequence [])           = alpha
 wp alpha (Sequence (p:ps))       = wp (wp alpha (Sequence ps)) p
 wp alpha (Nondet ps)             = Conj [wp alpha p | p <- ps]
@@ -374,10 +386,10 @@ subBool x e (Equiv f g)     = Equiv (subBool x e f) (subBool x e g)
 subBool x e (K a f)         = K a (subBool x e f)
 subBool x e (Ann f g)       = Ann (subBool x e f) (subBool x e g)
 subBool x e (Box prog f)    = Box prog (subBool x e f)
-subBool x e (ForAllB n f)   = ForAllB n (subBool x e f)  
-subBool x e (ExistsB n f)   = ExistsB n (subBool x e f)  
-subBool x e (ForAllI n d f)   = ForAllI n d (subBool x e f)  
-subBool x e (ExistsI n d f)   = ExistsI n d (subBool x e f)  
+subBool x e (ForAllB n ags f)     = ForAllB n ags (subBool x e f)  
+subBool x e (ExistsB n ags f)     = ExistsB n ags (subBool x e f)  
+subBool x e (ForAllI n ags d f)   = ForAllI n ags d (subBool x e f)  
+subBool x e (ExistsI n ags d f)   = ExistsI n ags d (subBool x e f)  
 
 -- | 'subNum' propagates the substitution inside integer expressions into a formula
 subNum :: Var -> NExpr -> Formula a -> Formula a
@@ -396,10 +408,10 @@ subNum x e (Equiv f g)       = Equiv (subNum x e f) (subNum x e g)
 subNum x e (K a f)           = K a (subNum x e f)
 subNum x e (Ann f g)         = Ann (subNum x e f) (subNum x e g)
 subNum x e (Box prog f)      = Box prog (subNum x e f)  -- no used
-subNum x e (ForAllB n f)        = ForAllB n (subNum x e f)
-subNum x e (ExistsB n f)        = ExistsB n (subNum x e f)
-subNum x e (ForAllI n d f)      = ForAllI n d (subNum x e f)
-subNum x e (ExistsI n d f)      = ExistsI n d (subNum x e f)
+subNum x e (ForAllB n ags f)        = ForAllB n ags (subNum x e f)
+subNum x e (ExistsB n ags f)        = ExistsB n ags (subNum x e f)
+subNum x e (ForAllI n ags d f)      = ForAllI n ags d (subNum x e f)
+subNum x e (ExistsI n ags d f)      = ExistsI n ags d (subNum x e f)
 
 --------------------------------
 -- * Conversion to string
@@ -409,8 +421,9 @@ instance Show (Formula a) where
   show f = toString f
 
 instance Show Var where
-  show (BVar a) = a
-  show (NVar d a) = a
+  -- TODO
+  show (BVar ags a) = a++ show ags
+  show (NVar ags d a) = a++show ags
 
 instance Show (Expr a) where
   show (BVal v) = show v
@@ -474,10 +487,10 @@ toPyStringPrec dCntxt f = bracket unbracketed where
     recurse     = toPyStringPrec dHere
     unbracketed = case f of
         Atom (B t)    -> show t
-        Atom (BVal (BVar b))    -> b 
+        Atom (BVal (BVar ags b))    -> b 
         Atom (Xoor (bs))  -> "allXoor([" ++ separateWithCommas [recurse (Atom b) | b <- bs]  ++ "])"
         Atom e -> show e
-        K ag p   -> "K_" ++ (identity ag) ++ " " ++ recurse p
+        K ag p   -> "K_" ++ (show ag) ++ " " ++ recurse p
         Ann f g   -> "[" ++ recurse f ++ "]" ++ recurse g
         Neg p   -> "Not(" ++ recurse p ++ ")"
         Conj [] -> "True"
@@ -489,10 +502,10 @@ toPyStringPrec dCntxt f = bracket unbracketed where
         Imp p q -> "Implies(" ++ recurse p ++ "," ++ recurse q ++ ")"
         Equiv p q -> "Equiv(" ++ recurse p ++ "," ++ recurse q ++ ")"
         Box prog q -> "{" ++ (show prog) ++ "}" ++ recurse q
-        ExistsB b f -> "Exists(XB[" ++ show b ++ "], "++ recurse f++ ")"
-        ForAllB b f -> "ForAll(UB[" ++ show b ++ "], "++ recurse f++ ")"
-        ExistsI b d f -> "Exists(XI[" ++ show b ++ "], "++ recurse f++ ")"
-        ForAllI b d f -> "ForAll(UI[" ++ show b ++ "], "++ recurse f++ ")"
+        ExistsB b ags f -> "Exists(XB[" ++ show b ++ "], " ++ show ags ++ recurse f++ ")"
+        ForAllB b ags f -> "ForAll(UB[" ++ show b ++ "], "++ show ags ++ recurse f++ ")"
+        ExistsI b ags d f -> "Exists(XI[" ++ show b ++ "], "++ show ags ++ recurse f++ ")"
+        ForAllI b ags d f -> "ForAll(UI[" ++ show b ++ "], "++ show ags ++ recurse f++ ")"
     bracket
         | dCntxt > dHere = \s -> "(" ++ s ++ ")"
         | otherwise      = id
@@ -503,10 +516,10 @@ toStringPrec dCntxt f = bracket unbracketed where
     recurse     = toStringPrec dHere
     unbracketed = case f of
         Atom (B t)    -> show t
-        Atom (BVal (BVar b))    -> b 
+        Atom (BVal (BVar ags b))    -> b 
         Atom (Xoor (bs))  -> "allXoor([" ++ separateWithCommas [recurse (Atom b) | b <- bs]  ++ "])"
         Atom e -> show e
-        K ag p   -> "K_" ++ (identity ag) ++ " " ++ recurse p
+        K ag p   -> "K_" ++ (show ag) ++ " " ++ recurse p
         Ann f g   -> "[" ++ recurse f ++ "]" ++ recurse g
         Neg p   -> "¬" ++ recurse p
         Conj [] -> "True"
@@ -518,10 +531,10 @@ toStringPrec dCntxt f = bracket unbracketed where
         Imp p q -> recurse p ++ " ⇒ " ++ recurse q
         Equiv p q -> recurse p ++ " ⇔ " ++ recurse q
         Box prog q -> "{" ++ (show prog) ++ "}" ++ recurse q
-        ExistsB b f -> "∃yb" ++ show b ++ "⋅"++ recurse f
-        ForAllB b f -> "∀ub" ++ show b ++ "⋅"++ recurse f
-        ExistsI b d f -> "∃XI[" ++ show b ++ "]⋅"++ recurse f
-        ForAllI b d f -> "∀UI[" ++ show b ++ "]⋅"++ recurse f
+        ExistsB b ags f -> "∃yb" ++ show b ++ show ags  ++ "⋅"++ recurse f
+        ForAllB b ags f -> "∀ub" ++ show b ++ show ags ++ "⋅"++ recurse f
+        ExistsI b ags d f -> "∃XI[" ++ show b ++ "]"++ show ags ++"⋅" ++recurse f
+        ForAllI b ags d f -> "∀UI[" ++ show b ++ "]"++ show ags ++"⋅" ++recurse f
     bracket
         | dCntxt > dHere = \s -> "(" ++ s ++ ")"
         | otherwise      = id
