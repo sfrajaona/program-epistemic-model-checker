@@ -118,6 +118,6 @@ pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc,m,n] phi (tau phi α)
 swap1 = NAssign la (I 2) 
 alpha1 = Box swap1 (Atom (IVal la ≡ IVal ra)) 
 
-swap2 = NAssign n (IVal la) ⨟ NAssign m (IVal lb) ⨟ NAssign la (IVal m)  ⨟ NAssign lb (IVal n)
+swap2 = Sequence [NAssign n (IVal la), NAssign m (IVal lb), NAssign la (IVal m), NAssign lb (IVal n)]
 alpha2 = Box swap2 (Atom (IVal lb ≡ IVal rb)) 
 
