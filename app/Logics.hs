@@ -116,7 +116,7 @@ class Varable a where
 
 instance Varable (Formula t)
     where
-      freeVars f = L.nub (freeVars0 f) 
+      freeVars f = (L.nub (freeVars0 f)) 
       freeVars0 (Atom b) = freeVars0 b
       freeVars0 (Neg f) = freeVars0 f
       freeVars0 (Conj fs) = concatMap freeVars0 fs
@@ -156,6 +156,7 @@ instance Varable (Expr a)
 instance Varable Prog 
   where
     freeVars p = L.nub (freeVars0 p)
+    freeVars0 (New n p) = n:freeVars0 p 
     freeVars0 (Assume f) = freeVars0 f 
     freeVars0 (Assert f) = freeVars0 f 
     freeVars0 (BAssign v e) = v:freeVars0 e 
@@ -197,7 +198,7 @@ eIVar n ags d = NVar ags d ("XI[" ++ show n ++ "]")
 
 -- | 'uBVar' constructs an universal integer variable \(ui_i\) for an integer i 
 uIVar :: Int -> [Agent] -> IntDomain -> Var
-uIVar n ags d = NVar ags d ("UI[" ++ show n ++ "]")
+uIVar n ags d = NVar ags d ("UI " ++ show n)
 
 -- | this function chooses an appropriate index \(i\) 
 -- to build universal quantification \(\exists y_i \ldots\)
@@ -217,7 +218,13 @@ existsB ags f = ExistsB n ags body
 forAllI :: [Agent] -> IntDomain -> (Var ->  Formula Modal) -> Formula Modal
 forAllI ags dom f = ForAllI n ags dom body
   where body = f (uIVar n ags dom)
-        n    = (maxUIBV body + 1)
+        dummy = f (uIVar 0 ags dom)
+        maxFvs = maximum [quantVarNum var | var <- freeVars dummy]
+        n    = (maxUIBV body + 1) `max` maxFvs
+
+quantVarNum :: Var -> Int
+quantVarNum (NVar ags d str) | (head $ words str) == "UI" = read (last $ words str):: Int 
+                             | otherwise = 0
 
 -- | similar to 'existsB' but for non-bool domains
 existsI :: [Agent] -> IntDomain -> (Var -> Formula Modal) -> Formula Modal
@@ -288,6 +295,7 @@ maxUIBV (ExistsI n ags d f) = maxUIBV f
 maxUIBV (ForAllI n ags d f) = n
 maxUIBV (K ag f) = maxUIBV f 
 maxUIBV (KV ag v) = 0 
+maxUIBV (KVe ag v) = 0 
 maxUIBV (Ann f g) = maxUIBV f `max` maxUIBV g
 maxUIBV (Box p f) = maxUIBV f 
 
@@ -329,7 +337,7 @@ wp alpha (New (NVar ags d v) prog)   = forAllI ags d (\k -> (sub (NVar ags d v) 
 wp alpha (New (BVar ags v) prog)   = forAllB ags (\k -> (sub (BVar ags v) (BVal k) (wp alpha prog)))
 wp alpha (BAssign v e)           = forAllB (nonObservers v) (\k -> (Ann (Atom (BEq (BVal k) e)) (sub v (BVal k) alpha)))
 wp alpha (NAssign v e)           = forAllI (nonObservers v) (varDom v) (\k -> (Ann (Atom (Eq (IVal k) e)) (sub v (IVal k) alpha)))
-wp alpha (Sequence [])           = alpha
+wp alpha (Sequence [p])           = wp alpha p
 wp alpha (Sequence (p:ps))       = wp (wp alpha (Sequence ps)) p
 wp alpha (Nondet ps)             = Conj [wp alpha p | p <- ps]
 
@@ -406,6 +414,8 @@ subNum x e (Disj fs)         = Disj [subNum x e f | f <- fs]
 subNum x e (Imp f g)         = Imp (subNum x e f) (subNum x e g)
 subNum x e (Equiv f g)       = Equiv (subNum x e f) (subNum x e g)
 subNum x e (K a f)           = K a (subNum x e f)
+subNum x e (KV a v)          = KV a v
+subNum x e (KVe a v)         = KVe a v
 subNum x e (Ann f g)         = Ann (subNum x e f) (subNum x e g)
 subNum x e (Box prog f)      = Box prog (subNum x e f)  -- no used
 subNum x e (ForAllB n ags f)        = ForAllB n ags (subNum x e f)

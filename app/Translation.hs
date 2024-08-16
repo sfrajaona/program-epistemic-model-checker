@@ -42,17 +42,18 @@ tau phi (Disj as)              = Disj [tau phi a | a <- as]
 tau phi (Imp alpha1 alpha2)    = tau phi alpha1 ⇒ tau phi alpha2
 tau phi (Equiv alpha1 alpha2)  = (tau phi (alpha1 ⇒ alpha2)) ∧ (tau phi (alpha2 ⇒ alpha1))
 -- TODO: nonobs ag ∩ freeVars (alpha)? 
-tau phi (K ag alpha)           = mkForAll (L.nub $ concatMap (nonObs ag) [phi,alpha]) (phi ⇒ tau phi alpha)
+tau phi (K ag alpha)           = tau phi alpha ∧ mkForAll (L.nub $ concatMap (nonObs ag) [phi,alpha]) (phi ⇒ tau phi alpha)
 tau phi (KV a (NVar ags dom v))    = existsI [] dom (\z -> tau phi (K a (Atom (IVal (NVar ags dom v) ≡ IVal z)))) 
 tau phi (KVe a (NVar ags dom v))   = forAllI [] dom (\z -> tau phi ((Atom (IVal (NVar ags dom v) ≡ IVal z)) ⇒ K a (Atom (IVal (NVar ags dom v) ≡ IVal z))))  
 tau phi (NegKVe a (NVar ags dom v))= forAllI [] dom (\z -> tau phi (Atom (IVal (NVar ags dom v) ≡ IVal z) ⇒ Neg (K a (Atom (IVal (NVar ags dom v) ≡ IVal z)))))
-tau phi (Ann beta alpha)       = tau phi beta ⇒ tau (phi ∧ (tau phi beta)) alpha
 -- direct translation for assume and assert, without wp, for performance
+tau phi (Ann beta alpha)       = tau phi beta ⇒ tau (phi ∧ (tau phi beta)) alpha
 tau phi (Box (Assume beta) alpha)     = tau phi (Ann beta alpha) 
 tau phi (Box (Assert beta) alpha)     = tau phi beta ∧ tau phi (Ann beta alpha)
 tau phi (Box p alpha)          = tau phi (wp alpha p)  
--- tau phi (Box (BAssign x e) alpha)     = forAllB (\k -> tau phi (Ann (Atom (BEq (BVal k) e)) (sub x (BVal k) alpha)))
--- tau phi (Box (NAssign x e) alpha)     = forAllI (varDom x) (\k -> tau phi (Ann (Atom (Eq (IVal k) e)) (sub x (IVal k) alpha)))
+-- tau phi (Box (BAssign x e) alpha)     = forAllB (nonObservers x) (\k -> tau phi (Ann (Atom (BEq (BVal k) e)) (sub x (BVal k) alpha)))
+-- tau phi (Box (NAssign x e) alpha)     = forAllI (nonObservers x) (varDom x) (\k -> tau phi (Ann (Atom (Eq (IVal k) e)) (sub x (IVal k) alpha)))
+-- tau phi (Box (New x p) alpha)         = forAllI (nonObservers x) (varDom x) (\k -> tau phi (sub x (IVal k) (Box p alpha)))
 -- tau phi (Box (Sequence [p]) alpha)    = tau phi (Box p alpha)
 -- tau phi (Box (Sequence (p:ps)) alpha) = tau phi (Box p (Box (Sequence ps) alpha))
 -- tau phi (Box (Nondet ps) alpha)       = Conj [tau phi (Box p alpha) | p <- ps ]

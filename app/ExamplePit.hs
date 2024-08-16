@@ -19,22 +19,37 @@ b = Agent "b"
 c :: Agent 
 c = Agent "c"
 
+agents = [a,b,c] 
+
 cardDom = (2,5)  -- the bounds of the domain
 
-la :: Var
-la = NVar [b,c] cardDom ("la")
-ra :: Var
-ra = NVar [b,c] cardDom ("ra")
+left :: Agent -> Var
+left (Agent ag) = NVar (agents\\[Agent ag]) cardDom ("l"++ag) 
 
-lb :: Var
-lb = NVar [a,c] cardDom ("lb")
-rb :: Var
-rb = NVar [a,c] cardDom ("rb")
+right :: Agent -> Var
+right (Agent ag) = NVar (agents\\[Agent ag]) cardDom ("r"++ag) 
 
-lc :: Var
-lc = NVar [a,b] cardDom ("lc")
-rc :: Var
-rc = NVar [a,b] cardDom ("rc")
+la = left a
+ra = right a
+lb = left b
+rb = right b
+lc = left c
+rc = right c
+
+-- la :: Var
+-- la = NVar [b,c] cardDom ("la")
+-- ra :: Var
+-- ra = NVar [b,c] cardDom ("ra")
+
+-- lb :: Var
+-- lb = NVar [a,c] cardDom ("lb")
+-- rb :: Var
+-- rb = NVar [a,c] cardDom ("rb")
+
+-- lc :: Var
+-- lc = NVar [a,b] cardDom ("lc")
+-- rc :: Var
+-- rc = NVar [a,b] cardDom ("rc")
 
 
 
@@ -80,6 +95,7 @@ phi = Conj [
 -- we define the functions pitSat and pitProve to performs simple tests
 --
 pitSat α = sat $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
+pitAllSat α = allSat $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 
 ------------ USAGE in GHCI ---------------
@@ -88,17 +104,13 @@ pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 -- :l ExamplePit
 --------------------------------
 
----------------------------------
--- >>> pitSat $ KV a rb
--- Unsatisfiable
---
 ----------------------------------
 -- >>> pitProve $ KV a ra
 -- Q.E.D
 --
 ----------------------------------
--- >>> pitSat $ KV a ra
---  Satisfiable. Model:
+-- >>> pitProve $ Neg (KV a ra)
+--  Falsifiable. Counter-example
 --  la = 5 :: Integer
 --  ra = 3 :: Integer
 --  lb = 5 :: Integer
@@ -110,26 +122,87 @@ pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 ---------------------------------
 -- ACTIONs
 ---------------------------------
--- not a real swap DEBUGGING
--- swap1 = NAssign la (I 2) 
--- wp11 = wp (Atom (IVal la ≡ IVal ra)) swap1
--- wp12 = wp (K b $ Atom (IVal la ≡ IVal ra)) swap1
 
 
--- alpha11 = Box swap1 (Atom (IVal la ≡ IVal ra)) 
--- alpha12 = Box swap1 (K b (Atom (IVal la ≡ IVal ra)))
--- alpha13 = Box swap1 (K a (Atom (IVal la ≡ IVal ra)))
+-- the following action swap1 swaps la <-> lb
+swap1 = New n (New m (Sequence [NAssign n (IVal la), NAssign m (IVal lb), NAssign lb (IVal n), NAssign la (IVal m)])) 
 
--- the real swap
 n = NVar [a,b,c] cardDom "n"
-swap2 = Sequence [New n (NAssign n (IVal la)), NAssign lb (IVal n)]
-wp2 = wp (Atom (IVal la ≡ IVal ra)) swap2
+m = NVar [a,b,c] cardDom "m"
 
-alpha21 = Box swap2 (Atom (IVal lb ≡ IVal rb)) 
-alpha22 = Box swap2 (K a (Atom (IVal lb ≡ IVal rb))) 
-alpha23 = Box swap2 (K b (Atom (IVal lb ≡ IVal rb))) 
+alpha21 = Neg $ Box swap1 (Atom $ IVal lb ≡ IVal rb) 
+-- ^ Can  lb=rb after the swap? YES
+-- ghci> pitProve alpha21
+-- Falsifiable. Counter-example:
+--  la = 3 :: Integer
+--  ra = 2 :: Integer
+--  lb = 5 :: Integer
+--  rb = 3 :: Integer
+--  lc = 2 :: Integer
+--  rc = 5 :: Integer
 
-alpha24 = Box swap2 (KV a lb) 
+alpha22 = Box swap1 (K a (Atom $ IVal lb ≡ IVal rb)) 
+-- ^ Can a know that lb=rb after the swap? expect this to be NO
+-- ghci> pitProve $ Neg alpha22
+
+has :: Agent -> Integer -> ModalFormula
+has ag i = ((Atom $ IVal (left ag) ≡ I i) ∨ (Atom $ IVal (right ag) ≡ I i)) 
+
+alpha24 = Box swap1 (K a (Neg. Atom $ IVal lb ≡ IVal rb)) 
+-- ^ Can a know that lb≠rb after the swap? YES
+-- ghci> pitProve $ Neg alpha24
+-- Falsifiable. Counter-example:
+--  la = 3 :: Integer
+--  ra = 2 :: Integer
+--  lb = 3 :: Integer
+--  rb = 5 :: Integer
+--  lc = 2 :: Integer
+--  rc = 5 :: Integer
+
+alpha23 = Box swap1 (K b (Atom $ IVal lb ≡ IVal rb))
+-- ^ Can b know that lb=rb after the swap? YES
+-- ghci> pitProve $ Neg alpha23 
+-- Falsifiable. Counter-example:
+-- la = 3 :: Integer
+-- ra = 2 :: Integer
+-- lb = 5 :: Integer
+-- rb = 3 :: Integer
+-- lc = 5 :: Integer
+-- rc = 2 :: Integer
+
+kv :: Agent -> Var -> ModalFormula
+kv a card = K a (Atom $ IVal card ≡ I 5) ∨ K a (Atom $ IVal card ≡ I 3) ∨ K a (Atom $ IVal card ≡ I 2)
+
+alpha25 = Box swap1 (kv a lb) 
+-- ^ Does a always know the value of lb after the swap? YES
+-- ghci> pitProve alpha25 
+-- Q.E.D
+
+
+alpha27 = Box swap1 (K a (Neg (Atom $ IVal lb ≡ IVal rb))) 
+-- ^ Can a know that b does not make corner after the swap? YES
+-- ghci> pitProve $ Neg alpha27
+-- Falsifiable. Counter-example:
+-- la = 3 :: Integer
+-- ra = 2 :: Integer
+-- lb = 3 :: Integer
+-- rb = 5 :: Integer
+-- lc = 2 :: Integer
+-- rc = 5 :: Integer
+
+alpha28 = Box swap1 (K a (has c 5))
+-- ^ Can a ever know that c has a 5? YES
+-- ghci> pitProve $ Neg alpha28
+-- Falsifiable. Counter-example:
+-- la = 5 :: Integer
+-- ra = 3 :: Integer
+-- lb = 3 :: Integer
+-- rb = 2 :: Integer
+-- lc = 5 :: Integer
+-- rc = 2 :: Integer
+--
+-- (a knows that c must have a 5 otherswise c must have two 2s, which is impossible)
+
 
 
 
