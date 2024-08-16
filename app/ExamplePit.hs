@@ -11,7 +11,6 @@ import ToSBV
 --------------------------
 -- AGENTS and VARIABLES --
 --------------------------
--- TODO IMPORTANT: variable are 
 a :: Agent 
 a = Agent "a"
 b :: Agent 
@@ -35,22 +34,6 @@ lb = left b
 rb = right b
 lc = left c
 rc = right c
-
--- la :: Var
--- la = NVar [b,c] cardDom ("la")
--- ra :: Var
--- ra = NVar [b,c] cardDom ("ra")
-
--- lb :: Var
--- lb = NVar [a,c] cardDom ("lb")
--- rb :: Var
--- rb = NVar [a,c] cardDom ("rb")
-
--- lc :: Var
--- lc = NVar [a,b] cardDom ("lc")
--- rc :: Var
--- rc = NVar [a,b] cardDom ("rc")
-
 
 
 -----------------------------------------------------
@@ -92,10 +75,12 @@ phi = Conj [
 --------------------------------
 -- Simple TESTS 
 --------------------------------
--- we define the functions pitSat and pitProve to performs simple tests
---
-pitSat α = sat $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
-pitAllSat α = allSat $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
+-- we define the functions pitSat and pitProve 
+
+-- | pitProve takes a program epistemic formula alpha,
+-- and tries to prove it in the context phi
+-- i.e., it proves whether [[phi]] ⊧_LDK alpha
+-- which correspond to [[phi]] ⊧_FO \tau (phi, alpha) by our main theorem
 pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 
 ------------ USAGE in GHCI ---------------
@@ -104,12 +89,9 @@ pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 -- :l ExamplePit
 --------------------------------
 
-----------------------------------
--- >>> pitProve $ KV a ra
--- Q.E.D
---
-----------------------------------
--- >>> pitProve $ Neg (KV a ra)
+------------- Simple Test ---------------------
+-- A can know that (la = 5)
+-- >>> pitProve $ Neg (K a (Atom $ Eq (IVal la) (I 5)))
 --  Falsifiable. Counter-example
 --  la = 5 :: Integer
 --  ra = 3 :: Integer
@@ -120,37 +102,39 @@ pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 ---------------------------------
   
 ---------------------------------
--- ACTIONs
+-- ACTIONs --  
+-- swap1 = la <-> lb, using new hidden variables
+-- players place their cards FACE DOWN on the table
 ---------------------------------
 
-
--- the following action swap1 swaps la <-> lb
-swap1 = New n (New m (Sequence [NAssign n (IVal la), NAssign m (IVal lb), NAssign lb (IVal n), NAssign la (IVal m)])) 
-
+-- the cards on the table are represented by variables n and m
 n = NVar [a,b,c] cardDom "n"
 m = NVar [a,b,c] cardDom "m"
 
-alpha21 = Neg $ Box swap1 (Atom $ IVal lb ≡ IVal rb) 
--- ^ Can  lb=rb after the swap? YES
--- ghci> pitProve alpha21
--- Falsifiable. Counter-example:
---  la = 3 :: Integer
---  ra = 2 :: Integer
---  lb = 5 :: Integer
---  rb = 3 :: Integer
---  lc = 2 :: Integer
---  rc = 5 :: Integer
+swap1 :: Prog
+swap1 = New n (New m (Sequence [NAssign n (IVal la), NAssign m (IVal lb), NAssign lb (IVal n), NAssign la (IVal m)])) 
 
-alpha22 = Box swap1 (K a (Atom $ IVal lb ≡ IVal rb)) 
--- ^ Can a know that lb=rb after the swap? expect this to be NO
--- ghci> pitProve $ Neg alpha22
 
 has :: Agent -> Integer -> ModalFormula
 has ag i = ((Atom $ IVal (left ag) ≡ I i) ∨ (Atom $ IVal (right ag) ≡ I i)) 
 
-alpha24 = Box swap1 (K a (Neg. Atom $ IVal lb ≡ IVal rb)) 
--- ^ Can a know that lb≠rb after the swap? YES
--- ghci> pitProve $ Neg alpha24
+alpha12 = Box swap1 (K b (Atom $ IVal lb ≡ IVal rb))
+-- ^ B can know that lb=rb after swap1
+-- ghci> pitProve $ Neg alpha12 
+-- Falsifiable. Counter-example:
+-- la = 3 :: Integer
+-- ra = 2 :: Integer
+-- lb = 5 :: Integer
+-- rb = 3 :: Integer
+-- lc = 5 :: Integer
+-- rc = 2 :: Integer
+alpha13 = Neg $ Box swap1 (K a (Atom $ IVal lb ≡ IVal rb)) 
+-- ^ A can never know that B makes a corner (lb=rb) after swap1
+-- ghci> pitProve $ alpha13
+-- Q.E.D
+alpha14 = Box swap1 (K a (Neg. Atom $ IVal lb ≡ IVal rb)) 
+-- ^ A can learn that B does not make a corner (lb≠rb) after swap1
+-- ghci> pitProve $ Neg alpha14
 -- Falsifiable. Counter-example:
 --  la = 3 :: Integer
 --  ra = 2 :: Integer
@@ -159,40 +143,17 @@ alpha24 = Box swap1 (K a (Neg. Atom $ IVal lb ≡ IVal rb))
 --  lc = 2 :: Integer
 --  rc = 5 :: Integer
 
-alpha23 = Box swap1 (K b (Atom $ IVal lb ≡ IVal rb))
--- ^ Can b know that lb=rb after the swap? YES
--- ghci> pitProve $ Neg alpha23 
--- Falsifiable. Counter-example:
--- la = 3 :: Integer
--- ra = 2 :: Integer
--- lb = 5 :: Integer
--- rb = 3 :: Integer
--- lc = 5 :: Integer
--- rc = 2 :: Integer
-
 kv :: Agent -> Var -> ModalFormula
 kv a card = K a (Atom $ IVal card ≡ I 5) ∨ K a (Atom $ IVal card ≡ I 3) ∨ K a (Atom $ IVal card ≡ I 2)
 
-alpha25 = Box swap1 (kv a lb) 
--- ^ Does a always know the value of lb after the swap? YES
--- ghci> pitProve alpha25 
+alpha15 = Box swap1 (kv a lb) 
+-- ^ A always knows the value of lb after swap1
+-- ghci> pitProve alpha15 
 -- Q.E.D
 
-
-alpha27 = Box swap1 (K a (Neg (Atom $ IVal lb ≡ IVal rb))) 
--- ^ Can a know that b does not make corner after the swap? YES
--- ghci> pitProve $ Neg alpha27
--- Falsifiable. Counter-example:
--- la = 3 :: Integer
--- ra = 2 :: Integer
--- lb = 3 :: Integer
--- rb = 5 :: Integer
--- lc = 2 :: Integer
--- rc = 5 :: Integer
-
-alpha28 = Box swap1 (K a (has c 5))
--- ^ Can a ever know that c has a 5? YES
--- ghci> pitProve $ Neg alpha28
+alpha16 = Box swap1 (K a (has c 5))
+-- ^ A can learn that C has a 5 after swap1
+-- ghci> pitProve $ Neg alpha16
 -- Falsifiable. Counter-example:
 -- la = 5 :: Integer
 -- ra = 3 :: Integer
@@ -204,5 +165,94 @@ alpha28 = Box swap1 (K a (has c 5))
 -- (a knows that c must have a 5 otherswise c must have two 2s, which is impossible)
 
 
+---------------------------------
+-- ACTIONs --  Nondeterministic swap 
+-- swap2 = (la <-> lb) ⊔ (la <-> rb) ⊔ (ra <-> lb) ⊔ (ra <-> rb)
+-- players place their cards *** FACE DOWN *** on the table
+---------------------------------
+
+swap :: Var -> Var -> Prog
+swap u v = New n (New m (Sequence [NAssign n (IVal u), NAssign m (IVal v), NAssign v (IVal n), NAssign u (IVal m)]))
+
+swap2 :: Prog
+swap2 = swap la lb ⊔ swap la rb ⊔ swap ra lb ⊔ swap ra rb
+
+alpha21 = Box swap2 (kv a lb) 
+-- ^ A does not always know the value of lb after swap2
+-- ghci> pitProve alpha21
+-- Falsifiable. Counter-example:
+--  la = 5 :: Integer
+--  ra = 2 :: Integer
+--  lb = 5 :: Integer
+--  rb = 3 :: Integer
+--  lc = 3 :: Integer
+--  rc = 2 :: Integer
+
+alpha22 = Box swap2 ((kv a lb) ∨ (kv a rb))
+-- ^ A always knows the either value of lb or the value of rb after swap2
+-- ghci> pitProve alpha22
+-- Q.E.D
+--
+alpha23 = Box swap2 ((kv c lb) ∨ (kv c rb))
+-- ^ C never learns lb or rc after swap2
+-- ghci> pitProve $ Neg alpha23
+-- Q.E.D
 
 
+---------------------------------
+-- ACTIONs --  Nondeterministic swap 
+-- swap3 = (la <-> lb) ⊔ (la <-> rb) ⊔ (ra <-> lb) ⊔ (ra <-> rb)
+-- players place their cards *** FACE UP *** on the table
+-- now this action affect the knowledge of C unlike the previous swaps
+---------------------------------
+
+-- the cards on the table (visible for all this time)  are represented by variables 
+-- n' and m'
+n' = NVar [] cardDom "n"
+m' = NVar [] cardDom "m"
+
+swap' :: Var -> Var -> Prog
+swap' u v = New n' (New m' (Sequence [NAssign n' (IVal u), NAssign m' (IVal v), NAssign v (IVal n'), NAssign u (IVal m')]))
+
+swap3 :: Prog
+swap3 = swap' la lb ⊔ swap' la rb ⊔ swap' ra lb ⊔ swap' ra rb
+
+alpha31 = Box swap3 ((kv c lb) ∨ (kv c rb))
+-- ^ C either learns lb or rc after swap3
+-- ghci> pitProve $ alpha33
+-- Q.E.D
+
+alpha32 = Box swap3 ((kv c lb) ∧ (kv c rb))
+-- ^ C does not always learns both lb or rc after swap3
+-- ghci> pitProve $ alpha32
+-- Falsifiable. Counter-example:
+--  la = 3 :: Integer
+--  ra = 5 :: Integer
+--  lb = 5 :: Integer
+--  rb = 2 :: Integer
+--  lc = 3 :: Integer
+--  rc = 2 :: Integer
+--
+--  e.g., with la <-> lb
+--
+-- ^ Actually, C can never always learn both lb or rc after swap3
+-- ghci> pitProve $ Neg alpha32
+-- Q.E.D
+
+alpha33 = Box swap3 ((K c (Atom $ IVal lb ≡ IVal rb)) ∨ (K c (Atom $ IVal la ≡ IVal ra)))
+-- ^ C can never know that one of A and B has corner after swap3
+-- ghci> pitProve $ Neg alpha33
+-- Q.E.D
+
+alpha34 = Box swap3 (K c ((Neg . Atom $ IVal lb ≡ IVal rb) ∧ (Neg . Atom $ IVal la ≡ IVal ra)))
+-- ^ C can know that both A and B do not have corner after swap3
+-- ghci> pitProve $ Neg alpha34
+-- Falsifiable. Counter-example:
+--  la = 5 :: Integer
+--  ra = 2 :: Integer
+--  lb = 3 :: Integer
+--  rb = 2 :: Integer
+--  lc = 3 :: Integer
+--  rc = 5 :: Integer
+-- 
+-- e.g. with ra <-> rb, C sees that the exchange cards have the same suit
