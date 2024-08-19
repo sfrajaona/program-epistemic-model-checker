@@ -18,12 +18,12 @@ stack build
 ### Running provided examples with ghci
 
 
-Run ghci with on the project folder by
+Run ghci on the project folder with
 ```
 stack repl
 ```
 
-On ghci. For each example, load the example file in ghci, so that you can use the functions inside it directly.
+On ghci, load an example file in ghci, so that you can use the functions inside it directly.
 ```
 ghci>:l ExampleCherylsBirthday
 --------------------------------
