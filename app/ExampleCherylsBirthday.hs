@@ -4,6 +4,12 @@ Description : Translation of the Cheryl's Birthday puzzle into a
   first-order satisfiability problem
   See also the companion paper here https://doi.org/10.48550/arXiv.2206.13841
 Maintainer: S.F. Rajaona sfrajaona@gmail.com
+
+There are two options
+
+solve directly in Haskell via the SBV solver (see ExampleCherylsBirthday.hs)
+
+generate the first order formula from the Haskell translator (ExampleCherylsBirthday.hs) then call another SMT API (e.g. z3cherylsBirthday.py) to solve the formula from the output file.
 -}
 module ExampleCherylsBirthday where
 import Data.List

@@ -4,8 +4,8 @@
 Module      : Translation
 Description : Defines the translation \(\tau\) of a \(\mathcal{L}_{\square K}\) formula
 into a \(\mathcal{L}_{FO}\) formula
-PLEASE Note that the following translation tau by-pass weakest preconditions
-and does not use public announcement formula, since [β]α = {β?}α  
+
+    Haskell translator (Logic.hs and Translation.hs): implements the function tau which transforms a program-epistemic validity into first-order validity
 
 See also the companion paper here https://doi.org/10.48550/arXiv.2206.13841
 Maintainer: S.F. Rajaona sfrajaona@gmail.com

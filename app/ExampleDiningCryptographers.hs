@@ -12,6 +12,7 @@ The dinner may have been paid by their employer (the NSA), or by one of the agen
 They execute a protocol to reveal whether one of the agents paid, but without revealing which one. 
 The protocol supplies each pair of adjacent agents with a random coin, which can be observed only by that pair. Each agent announces the result of XORing three Booleans: the two coins observable by her and the status of whether she paid for the dinner. The XOR of all announcements is proven to be equal to the disjunction of whether any agent paid.
 
+Dining Cryptographers: The translated formula is directly encoded in z3dc.py. The SP-based translation used for comparison (i.e. Gorogiannis et al 2017) is encoded in z3dcSP.py.
 -}
 module ExampleDiningCryptographers where
 import Data.Map (Map, fromList, (!))

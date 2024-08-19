@@ -4,9 +4,10 @@
 Module      : Logics
 
 The module define the logical languages and everything that is needed inside them
+
 * agents and variables 
 * expressions (boolean and integer expressions),
-* \mathcal{L_{DK}}, \mathcal{L_{\square K}}, \mathcal{L}_{FO} formulas
+* \(\mathcal{L_{DK}}, \mathcal{L_{\square K}}, \mathcal{L}_{FO}\) formulas
 * programs inside the box
 * weakest preconditions, strongest postconditions
 * substitutions in expressions and formulas
@@ -22,10 +23,12 @@ import Data.Int
 import Data.Map (Map, fromList, (!))
 import Debug.Trace
 
+-- ==================
+-- * Logic Syntax
+-- ==================
 ----------------------------
--- * Agents and Variables
+-- ** Agents and Variables
 --------------------------
--- | an 'Agent' is determined by its identity and the set of nonobservable variables
 data Agent = Agent String
    deriving (Eq, Ord)
 
@@ -34,8 +37,8 @@ instance Show Agent
     show (Agent a) = a
 
 -- | variables are string, we give a domain for integer variables
--- the domain is necessarily only if using SBV, in which quantifications
--- are transformed into conjunctions/disjunctions
+-- the domain is necessarily only if using SBV for 
+-- variables are also labelled with a set of agents that cannot observe them
 data Var = BVar [Agent] String | NVar [Agent] IntDomain String
    deriving (Eq, Ord)
 
@@ -59,17 +62,16 @@ nonObs :: Agent -> ModalFormula -> [Var]
 nonObs a phi =  (L.nub [v | v <- freeVars phi, a `elem` nonObservers v]) 
 
 ------------------------------------------------
--- * Expressions (boolean expressions)
-------------------------------------------------
+-- ** Expressions 
+-- ------------------------------------------------
 data Expr a where
-    B       :: Bool -> Expr Bool        -- ^ Boolean constant 
-    BSymb   :: SBool -> Expr Bool        -- ^ Boolean constant 
-    BVal    :: Var -> Expr Bool         -- ^ Boolean variable
+    B       :: Bool -> Expr Bool        -- ^  Boolean constant 
+    BSymb   :: SBool -> Expr Bool       -- ^  Boolean constant 
+    BVal    :: Var -> Expr Bool         -- ^  Boolean variable
     BEq     :: Expr Bool -> Expr Bool -> Expr Bool
     Xoor    :: [Expr Bool] -> Expr Bool  
     Oor     :: [Expr Bool] -> Expr Bool
     Aand    :: [Expr Bool] -> Expr Bool
-
     I      :: IntType  -> Expr Integer     
     ISymb  :: SInteger  -> Expr Integer     
     IVal :: Var -> Expr Integer           
@@ -82,7 +84,8 @@ type BExpr = Expr Bool
 type NExpr = Expr Integer
 
 -----------------------------------
--- * Logical Formulas \(\mathcal{L_{DK}}, \mathcal{L_{\square K}}, \mathcal{L}_{FO} \) 
+-- ** Logic Formulas 
+-- \(\mathcal{L_{DK}}, \mathcal{L_{\square K}}, \mathcal{L}_{FO} \) 
 -----------------------------------
 data Formula t where
    Atom      :: BExpr -> Formula t
@@ -103,69 +106,15 @@ data Formula t where
    ForAllI   :: Int -> [Agent] -> IntDomain -> Formula Modal -> Formula Modal 
    ExistsI   :: Int -> [Agent] -> IntDomain -> Formula Modal -> Formula Modal 
 
+-- | Knowing whether modality
 kw :: Agent -> ModalFormula -> ModalFormula
 kw ag alpha = Disj [K ag alpha, (K ag (Neg alpha))]
 
 data Modal
 type ModalFormula = Formula Modal
-
-
-class Varable a where
-    freeVars0 :: a -> [Var]  
-    freeVars  :: a -> [Var] 
-
-instance Varable (Formula t)
-    where
-      freeVars f = (L.nub (freeVars0 f)) 
-      freeVars0 (Atom b) = freeVars0 b
-      freeVars0 (Neg f) = freeVars0 f
-      freeVars0 (Conj fs) = concatMap freeVars0 fs
-      freeVars0 (Disj fs) = concatMap freeVars0 fs
-      freeVars0 (Imp f g) = freeVars0 f ++ freeVars0 g
-      freeVars0 (Equiv f g) = freeVars0 f ++ freeVars0 g
-      freeVars0 (K a f) = freeVars0 f
-      freeVars0 (KV ag v) = [v] 
-      freeVars0 (KVe ag v) = [v] 
-      freeVars0 (NegKVe ag v) = [v] 
-      freeVars0 (Ann f g) = freeVars0 f ++ freeVars0 g
-      freeVars0 (Box f g) = freeVars0 f ++ freeVars0 g
-      freeVars0 (Box' f g) = freeVars0 f ++ freeVars0 g
-      freeVars0 (ForAllB i ags f) = freeVars0 f
-      freeVars0 (ExistsB i ags f) = freeVars0 f
-      freeVars0 (ForAllI i ags d f) = freeVars0 f
-      freeVars0 (ExistsI i ags d f) = freeVars0 f
-
-instance Varable (Expr a) 
-  where
-    freeVars f = L.nub (freeVars0 f)
-    freeVars0 (B b) = []  
-    freeVars0 (BSymb b) = []  
-    freeVars0 (BVal v) = [v]  
-    freeVars0 (BEq b b') = freeVars0 b ++ freeVars0 b'
-    freeVars0 (Xoor bs) = concatMap freeVars0 bs
-    freeVars0 (Oor bs) = concatMap freeVars0 bs
-    freeVars0 (Aand bs) = concatMap freeVars0 bs
-    freeVars0 (I n) = []  
-    freeVars0 (ISymb n) = []  
-    freeVars0 (IVal v) = [v]  
-    freeVars0 (Add n n') = freeVars0 n ++ freeVars0 n'
-    freeVars0 (Mul n n') = freeVars0 n ++ freeVars0 n'
-    freeVars0 (Eq n n') = freeVars0 n ++ freeVars0 n'
-    freeVars0 (LEq n n') = freeVars0 n ++ freeVars0 n'
-
-instance Varable Prog 
-  where
-    freeVars p = L.nub (freeVars0 p)
-    freeVars0 (New n p) = n:freeVars0 p 
-    freeVars0 (Assume f) = freeVars0 f 
-    freeVars0 (Assert f) = freeVars0 f 
-    freeVars0 (BAssign v e) = v:freeVars0 e 
-    freeVars0 (NAssign v e) = v:freeVars0 e 
-    freeVars0 (Sequence ps) = concatMap freeVars0 ps
-    freeVars0 (Nondet ps) = concatMap freeVars0 ps
     
 
--- | Shotcuts
+-- ** Unicode shorthands
 (∨) f g = Disj [f,g]  
 (∧) f g = Conj [f,g]  
 (⇒) f g = Imp f g
@@ -181,7 +130,7 @@ false = Atom (B False)
 (⊕) f g = Xoor [f, g] 
 
 ----------------------------------------------------------------------------
--- * Mechanism for dealing with quanitifiers
+-- * Quantifiers Construction
 ----------------------------------------------------------------------------
 
 -- | 'eBVar' constructs an existential boolean variable \(xb_i\) for an integer i 
@@ -302,6 +251,7 @@ maxUIBV (Box p f) = maxUIBV f
 ----------------------------
 -- * Programming Language
 ----------------------------
+-- ** Program Syntax
 data Prog
     = Assume ModalFormula
     | Assert ModalFormula
@@ -312,9 +262,11 @@ data Prog
     | Nondet [Prog]
 
 ----------------------------
--- * Strongest Precondition for comparing with IJCAI'17 paper
+-- ** Strongest Precondition Semantics
+-- for comparing with IJCAI'17 paper
 ----------------------------
 sp :: ModalFormula -> Prog -> ModalFormula
+-- ^ Strongest postcondition semantics
 -- TODO add sp for new
 sp phi (Assume beta)       = beta ∧ phi
 sp phi (Assert beta)       = beta ⇒ phi
@@ -327,7 +279,7 @@ sp phi (Nondet ps)       = Disj [sp phi p | p <- ps]
 
 
 ----------------------------
--- * Weakest preconditions
+-- ** Weakest preconditions Semantics
 -- TODO: add wp for integer assignment
 ----------------------------
 wp :: ModalFormula -> Prog -> ModalFormula
@@ -341,8 +293,11 @@ wp alpha (Sequence [p])           = wp alpha p
 wp alpha (Sequence (p:ps))       = wp (wp alpha (Sequence ps)) p
 wp alpha (Nondet ps)             = Conj [wp alpha p | p <- ps]
 
+-- ============
+-- * Utility functions 
+-- ============
 --------------------------------
--- * Variable Substitution 
+-- ** Substitution 
 ----------------------------
 -- | sub is the main function, takes the variable, an expression, and the formula
 -- to make the substitution
@@ -424,7 +379,7 @@ subNum x e (ForAllI n ags d f)      = ForAllI n ags d (subNum x e f)
 subNum x e (ExistsI n ags d f)      = ExistsI n ags d (subNum x e f)
 
 --------------------------------
--- * Conversion to string
+-- ** Conversion to string
 ----------------------------
 
 instance Show (Formula a) where
@@ -553,3 +508,60 @@ toStringPrec dCntxt f = bracket unbracketed where
 separateWithCommas :: [String] -> String
 separateWithCommas [b] = b
 separateWithCommas (b:bs) = b ++ ", " ++ separateWithCommas bs
+
+-- ----------------------------
+-- ** Free Variables
+-- ----------------------------
+class Varable a where
+    freeVars0 :: a -> [Var]  
+    freeVars  :: a -> [Var] 
+
+instance Varable (Formula t)
+    where
+      freeVars f = (L.nub (freeVars0 f)) 
+      freeVars0 (Atom b) = freeVars0 b
+      freeVars0 (Neg f) = freeVars0 f
+      freeVars0 (Conj fs) = concatMap freeVars0 fs
+      freeVars0 (Disj fs) = concatMap freeVars0 fs
+      freeVars0 (Imp f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (Equiv f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (K a f) = freeVars0 f
+      freeVars0 (KV ag v) = [v] 
+      freeVars0 (KVe ag v) = [v] 
+      freeVars0 (NegKVe ag v) = [v] 
+      freeVars0 (Ann f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (Box f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (Box' f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (ForAllB i ags f) = freeVars0 f
+      freeVars0 (ExistsB i ags f) = freeVars0 f
+      freeVars0 (ForAllI i ags d f) = freeVars0 f
+      freeVars0 (ExistsI i ags d f) = freeVars0 f
+
+instance Varable (Expr a) 
+  where
+    freeVars f = L.nub (freeVars0 f)
+    freeVars0 (B b) = []  
+    freeVars0 (BSymb b) = []  
+    freeVars0 (BVal v) = [v]  
+    freeVars0 (BEq b b') = freeVars0 b ++ freeVars0 b'
+    freeVars0 (Xoor bs) = concatMap freeVars0 bs
+    freeVars0 (Oor bs) = concatMap freeVars0 bs
+    freeVars0 (Aand bs) = concatMap freeVars0 bs
+    freeVars0 (I n) = []  
+    freeVars0 (ISymb n) = []  
+    freeVars0 (IVal v) = [v]  
+    freeVars0 (Add n n') = freeVars0 n ++ freeVars0 n'
+    freeVars0 (Mul n n') = freeVars0 n ++ freeVars0 n'
+    freeVars0 (Eq n n') = freeVars0 n ++ freeVars0 n'
+    freeVars0 (LEq n n') = freeVars0 n ++ freeVars0 n'
+
+instance Varable Prog 
+  where
+    freeVars p = L.nub (freeVars0 p)
+    freeVars0 (New n p) = n:freeVars0 p 
+    freeVars0 (Assume f) = freeVars0 f 
+    freeVars0 (Assert f) = freeVars0 f 
+    freeVars0 (BAssign v e) = v:freeVars0 e 
+    freeVars0 (NAssign v e) = v:freeVars0 e 
+    freeVars0 (Sequence ps) = concatMap freeVars0 ps
+    freeVars0 (Nondet ps) = concatMap freeVars0 ps

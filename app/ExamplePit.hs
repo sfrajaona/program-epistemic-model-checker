@@ -22,6 +22,10 @@ agents = [a,b,c]
 
 cardDom = (2,5)  -- the bounds of the domain
 
+-- IMPORTANT NOTE --
+-- In the theory a variable is indexed by the observing agents
+-- here, in the implementation a variable is indexed by the non-ovserving agents
+
 left :: Agent -> Var
 left (Agent ag) = NVar (agents\\[Agent ag]) cardDom ("l"++ag) 
 
@@ -128,13 +132,13 @@ alpha12 = Box swap1 (K b (Atom $ IVal lb ≡ IVal rb))
 -- rb = 3 :: Integer
 -- lc = 5 :: Integer
 -- rc = 2 :: Integer
-alpha13 = Neg $ Box swap1 (K a (Atom $ IVal lb ≡ IVal rb)) 
+alpha13 =Box swap1 ((Atom $ IVal lb ≡ IVal rb) ⇒ (Neg $ K a (Atom $ IVal lb ≡ IVal rb))) 
 -- ^ A can never know that B makes a corner (lb=rb) after swap1
 -- ghci> pitProve $ alpha13
 -- Q.E.D
-alpha14 = Box swap1 (K a (Neg. Atom $ IVal lb ≡ IVal rb)) 
+alpha14 = Box swap1 (Neg $ K a (Neg. Atom $ IVal lb ≡ IVal rb)) 
 -- ^ A can learn that B does not make a corner (lb≠rb) after swap1
--- ghci> pitProve $ Neg alpha14
+-- ghci> pitProve $ alpha14
 -- Falsifiable. Counter-example:
 --  la = 3 :: Integer
 --  ra = 2 :: Integer
@@ -193,9 +197,9 @@ alpha22 = Box swap2 ((kv a lb) ∨ (kv a rb))
 -- ghci> pitProve alpha22
 -- Q.E.D
 --
-alpha23 = Box swap2 ((kv c lb) ∨ (kv c rb))
--- ^ C never learns lb or rc after swap2
--- ghci> pitProve $ Neg alpha23
+alpha23 = Box swap2 ( Neg (kv c lb))
+-- ^ C never learns lb or rb after swap2
+-- ghci> pitProve $ alpha23
 -- Q.E.D
 
 
@@ -218,7 +222,7 @@ swap3 :: Prog
 swap3 = swap' la lb ⊔ swap' la rb ⊔ swap' ra lb ⊔ swap' ra rb
 
 alpha31 = Box swap3 ((kv c lb) ∨ (kv c rb))
--- ^ C either learns lb or rc after swap3
+-- ^ C either learns lb or rb after swap3
 -- ghci> pitProve $ alpha33
 -- Q.E.D
 
@@ -239,14 +243,20 @@ alpha32 = Box swap3 ((kv c lb) ∧ (kv c rb))
 -- ghci> pitProve $ Neg alpha32
 -- Q.E.D
 
-alpha33 = Box swap3 ((K c (Atom $ IVal lb ≡ IVal rb)) ∨ (K c (Atom $ IVal la ≡ IVal ra)))
--- ^ C can never know that one of A and B has corner after swap3
--- ghci> pitProve $ Neg alpha33
--- Q.E.D
+alpha33 = Box swap3 (Neg $ (K c (Atom $ IVal lb ≡ IVal rb)))
+-- ^ C can know that B has corner after swap3
+-- ghci> pitProve $  alpha33
+-- Falsifiable. Counter-example:
+--  la = 2 :: Integer
+--  ra = 3 :: Integer
+--  lb = 5 :: Integer
+--  rb = 2 :: Integer
+--  lc = 3 :: Integer
+--  rc = 5 :: Integer
 
-alpha34 = Box swap3 (K c ((Neg . Atom $ IVal lb ≡ IVal rb) ∧ (Neg . Atom $ IVal la ≡ IVal ra)))
--- ^ C can know that both A and B do not have corner after swap3
--- ghci> pitProve $ Neg alpha34
+alpha34 = (Box swap3  (Neg $ K c (Neg . Atom $ IVal lb ≡ IVal rb)))
+-- ^ C can know that B does not have a corner after swap3
+-- ghci> pitProve $ alpha34
 -- Falsifiable. Counter-example:
 --  la = 5 :: Integer
 --  ra = 2 :: Integer

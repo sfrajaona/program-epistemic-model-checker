@@ -11,6 +11,8 @@ the constraint formula (a 'FOLFormula'), and the target formula
 NOTE: quantifiers are transformed into conjunction/disjunction
 because SBV only supports quantifications in Prenex Normal Form
 
+    SBV solver (ToSBV.hs): transforms the translated formula (and context phi) into an SBV predicate (Not very efficient because SBV currently supports f-o formula in Prenex form, and most of our translated formulas have nested quantifications.)
+
 See also the companion paper here https://doi.org/10.48550/arXiv.2206.13841
 Maintainer: S.F. Rajaona sfrajaona@gmail.com
 -}
