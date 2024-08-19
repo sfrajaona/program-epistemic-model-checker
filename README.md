@@ -43,7 +43,7 @@ ghci>:l ExampleCherylsBirthday
 ```
 
 ## Documentation 
-Haddock generated documentation can be accessed at docs/index.html
+Haddock generated documentation can be accessed at doc/index.html
 
 ## References
 Rajaona, F., Boureanu, I., Malvone, V., Belardinelli, F. (2023). Program Semantics and Verification Technique for AI-Centred Programs. In: Chechik, M., Katoen, JP., Leucker, M. (eds) Formal Methods. FM 2023. Lecture Notes in Computer Science, vol 14000. Springer, Cham. https://doi.org/10.1007/978-3-031-27481-7_27
