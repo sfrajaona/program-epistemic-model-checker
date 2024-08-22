@@ -23,8 +23,8 @@ import Data.SBV
 --------------------------
 albert  = Agent "Albert" 
 bernard = Agent "Bernard" 
-month   = NVar [bernard] monthDom ("month")
-day     = NVar [albert] dayDom ("day")
+month   = NVar [bernard] (5,8)  ("month")
+day     = NVar [albert] (14,19)  ("day")
 
 
 --------------------
@@ -45,7 +45,8 @@ phi = Disj [Atom (IVal month ≡ I 5) ∧ Atom (IVal day ≡ I 15),
 ------------------------------------------
 -- Program C  and  Weakest Precondition --
 ------------------------------------------
--- `KV x` means knowing the variable `x`
+-- KV based on quantification is faster  
+-- kv based on disjunction always works, but slow
 -- annAlbert1: "Albert does not know the day" and "Albert knows that Bernard does not know the month" 
 -- annBernard: "Bernard annouces he knows the month now" 
 --              the announcement "Bernard  didn't know the month before Albert's announcement"
@@ -53,23 +54,14 @@ phi = Disj [Atom (IVal month ≡ I 5) ∧ Atom (IVal day ≡ I 15),
 -- annAlbert2: "Albert annouces he knows the day now" 
   
   
-albert1  = Neg (KV albert day) ∧ K albert (Neg (KV bernard month))
-bernard1 = KV bernard month 
+albert1  = Neg (kv albert day) ∧ K albert (Neg (kv bernard month))
+bernard1 = kv bernard month 
 formula  = Ann' (Ann' albert1 bernard1) (kv albert day) 
 
-phi2 = Disj [
-            Atom (IVal month ≡ I 7) ∧ Atom (IVal day ≡ I 14),
-            Atom (IVal month ≡ I 7) ∧ Atom (IVal day ≡ I 16),
-            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 14),
-            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 15),
-            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 17)
-            ]
+albert1'  = Neg (KV albert day) ∧ K albert (Neg (KV bernard month))
+bernard1' = KV bernard month 
+formula'  = Ann' (Ann' albert1 bernard1) (KV albert day) 
 
-phi3 = Disj [
-            Atom (IVal month ≡ I 7) ∧ Atom (IVal day ≡ I 16),
-            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 15),
-            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 17)
-            ]
 
 cherylsProve α =  prove $ toSBV [month, day] phi (tau phi (α))
 cherylsAllSat α =  allSat $ toSBV [month, day] phi (tau phi (α))
@@ -100,6 +92,7 @@ dayDom = (1,31) --  could be 1 to 31
 -- USAGE
 
 cherylsBirthday = cherylsAllSat $ formula
+cherylsBirthday' = cherylsAllSat $ formula'
 ---------------------------------
 ------------ USAGE in GHCI ---------------
 -- Make sure you have installed SBV.
