@@ -107,7 +107,7 @@ dcAlpha2    = prove $ toSBV allVars phi (tau phi (Box progDC alpha2))
 -- -- ^
 -- DC with \(\alpha_2\) as in IJCAI paper
 --
--- >>> prove dcAlpha2
+-- >>> dcAlpha2
 -- Q.E.D.
 
 -- | proving \([progDC] \alpha_3\) (should be falsified) 
@@ -115,7 +115,7 @@ dcAlpha3    = prove $ toSBV allVars phi (tau phi (Box progDC alpha3))
 -- ^
 -- DC with \(\alpha_3\) as in IJCAI paper
 --
--- >>> prove dcAlpha3
+-- >>> dcAlpha3
 -- Falsifiable. Counter-example:
 --   x  = False :: Bool
 --   c0 = False :: Bool

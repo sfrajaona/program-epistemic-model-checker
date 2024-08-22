@@ -55,7 +55,24 @@ phi = Disj [Atom (IVal month ≡ I 5) ∧ Atom (IVal day ≡ I 15),
   
 albert1  = Neg (KV albert day) ∧ K albert (Neg (KV bernard month))
 bernard1 = KV bernard month 
-formula  = Box (Assert albert1 ⨟ Assert bernard1) (KV albert day)
+formula  = Ann' (Ann' albert1 bernard1) (kv albert day) 
+
+phi2 = Disj [
+            Atom (IVal month ≡ I 7) ∧ Atom (IVal day ≡ I 14),
+            Atom (IVal month ≡ I 7) ∧ Atom (IVal day ≡ I 16),
+            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 14),
+            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 15),
+            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 17)
+            ]
+
+phi3 = Disj [
+            Atom (IVal month ≡ I 7) ∧ Atom (IVal day ≡ I 16),
+            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 15),
+            Atom (IVal month ≡ I 8) ∧ Atom (IVal day ≡ I 17)
+            ]
+
+cherylsProve α =  prove $ toSBV [month, day] phi (tau phi (α))
+cherylsAllSat α =  allSat $ toSBV [month, day] phi (tau phi (α))
 
 -- ===========================================================================
 --           Method 1:   Outputting the translation to an external file  
@@ -81,14 +98,8 @@ dayDom = (1,31) --  could be 1 to 31
 
 
 -- USAGE
--- original version of the full puzzle
--- ------------------------------
--- cherylsBirthday = allSat $ toSBV [month, day] phi (tau phi (Conj [Neg (KV bernard month), formulaWp])) 
 
--- full puzzle but we can omit the the announcement Albert didn't know before
--- -----------------------------
-cherylsBirthday = prove $ toSBV [month, day] phi (tau phi (Neg formula))
-cherylsBirthdaySat = sat $ toSBV [month, day] phi (tau phi formula)
+cherylsBirthday = cherylsAllSat $ formula
 ---------------------------------
 ------------ USAGE in GHCI ---------------
 -- Make sure you have installed SBV.

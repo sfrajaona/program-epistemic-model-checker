@@ -12,7 +12,6 @@ KHoare: Progam Epistemic Logic to SMT model checker
 
 ### Install the Haskell dependencies by 
 ``` 
-stack init
 stack build
 ```
 ### Running provided examples with ghci

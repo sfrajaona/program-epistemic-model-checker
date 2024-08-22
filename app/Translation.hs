@@ -48,6 +48,7 @@ tau phi (KVe a (NVar ags dom v))   = forAllI [] dom (\z -> tau phi ((Atom (IVal 
 tau phi (NegKVe a (NVar ags dom v))= forAllI [] dom (\z -> tau phi (Atom (IVal (NVar ags dom v) ≡ IVal z) ⇒ Neg (K a (Atom (IVal (NVar ags dom v) ≡ IVal z)))))
 -- direct translation for assume and assert, without wp, for performance
 tau phi (Ann beta alpha)       = tau phi beta ⇒ tau (phi ∧ (tau phi beta)) alpha
+tau phi (Ann' beta alpha)       = tau phi beta ∧ tau (phi ∧ (tau phi beta)) alpha
 tau phi (Box (Assume beta) alpha)     = tau phi (Ann beta alpha) 
 tau phi (Box (Assert beta) alpha)     = tau phi beta ∧ tau phi (Ann beta alpha)
 tau phi (Box p alpha)          = tau phi (wp alpha p)  

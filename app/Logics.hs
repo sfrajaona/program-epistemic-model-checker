@@ -54,6 +54,10 @@ varDom :: Var -> IntDomain
 varDom (BVar ags a) = (0,1) 
 varDom (NVar ags d a) = d
 
+varDomRange :: Var -> [IntType] 
+varDomRange (BVar ags a) = [0,1] 
+varDomRange (NVar ags (x,y) a) = [x..y] 
+
 nonObservers :: Var -> [Agent] 
 nonObservers (BVar ags _) = ags 
 nonObservers (NVar ags _ _) = ags 
@@ -99,6 +103,7 @@ data Formula t where
    KVe       :: Agent -> Var -> Formula Modal
    NegKVe    :: Agent -> Var -> Formula Modal
    Ann       :: Formula Modal -> Formula Modal -> Formula Modal
+   Ann'       :: Formula Modal -> Formula Modal -> Formula Modal
    Box       :: Prog -> Formula Modal -> Formula Modal
    Box'      :: Prog -> Formula Modal -> Formula Modal
    ForAllB   :: Int -> [Agent] -> Formula Modal -> Formula Modal 
@@ -109,6 +114,9 @@ data Formula t where
 -- | Knowing whether modality
 kw :: Agent -> ModalFormula -> ModalFormula
 kw ag alpha = Disj [K ag alpha, (K ag (Neg alpha))]
+
+-- | Knowing a value as a disjunction
+kv a var = Disj [K a (Atom $ IVal var ≡ I n) | n <- varDomRange var] 
 
 data Modal
 type ModalFormula = Formula Modal
@@ -155,30 +163,37 @@ uIVar n ags d = NVar ags d ("UI " ++ show n)
 forAllB :: [Agent] -> (Var -> Formula Modal) -> Formula Modal
 forAllB ags f = ForAllB n ags body
   where body = f (uBVar n ags)
-        n    = (maxUBV body + 1)
+        dummy = f (uBVar 0 ags)
+        maxFvs = maximum [varNum "UB" var | var <- freeVars dummy]
+        n    = (maxUBV body `max` maxFvs) + 1
 
 -- | similar to 'forAllB' but with existential 
 existsB :: [Agent] -> (Var -> Formula Modal) -> Formula Modal
 existsB ags f = ExistsB n ags body
   where body = f (eBVar n ags)
-        n    = maxEBV body + 1
+        dummy = f (eBVar 0 ags)
+        maxFvs = maximum [varNum "EB" var | var <- freeVars dummy]
+        n    = (maxEBV body `max` maxFvs) + 1
 
 -- | similar to 'forAllB' but for variables on other domains 
 forAllI :: [Agent] -> IntDomain -> (Var ->  Formula Modal) -> Formula Modal
 forAllI ags dom f = ForAllI n ags dom body
   where body = f (uIVar n ags dom)
         dummy = f (uIVar 0 ags dom)
-        maxFvs = maximum [quantVarNum var | var <- freeVars dummy]
-        n    = (maxUIBV body + 1) `max` maxFvs
+        maxFvs = maximum [varNum "UI" var | var <- freeVars dummy]
+        n    = (maxUIBV body `max` maxFvs) + 1
 
-quantVarNum :: Var -> Int
-quantVarNum (NVar ags d str) | (head $ words str) == "UI" = read (last $ words str):: Int 
-                             | otherwise = 0
+
+varNum :: String -> Var -> Int
+varNum quantType v | (head $ words (varName v)) == quantType = read (last $ words (varName v)):: Int 
+                                  | otherwise = 0
 
 -- | similar to 'existsB' but for non-bool domains
 existsI :: [Agent] -> IntDomain -> (Var -> Formula Modal) -> Formula Modal
 existsI ags dom f = ExistsI n ags dom body
   where body = f (eIVar n ags dom)
+        dummy = f (eIVar 0 ags dom)
+        maxFvs = maximum [varNum "EI" var | var <- freeVars dummy]
         n    = maxEIBV body + 1
 
 -- Computes the maximum index of bound variables
@@ -196,6 +211,7 @@ maxEBV (ForAllI n ags d f) = maxEBV f
 maxEBV (K ag f) = maxEBV f 
 maxEBV (KV ag v) = 0 
 maxEBV (Ann f g) = maxEBV f `max` maxEBV g
+maxEBV (Ann' f g) = maxEBV f `max` maxEBV g
 maxEBV (Box p f) = maxEBV f 
 
 maxUBV :: Formula Modal -> Int
@@ -212,6 +228,7 @@ maxUBV (ForAllI n ags d f) = maxUBV f
 maxUBV (K ag f) = maxUBV f 
 maxUBV (KV ag v) = 0 
 maxUBV (Ann f g) = maxUBV f `max` maxUBV g
+maxUBV (Ann' f g) = maxUBV f `max` maxUBV g
 maxUBV (Box p f) = maxUBV f 
 
 -- Computes the maximum index of bound variables
@@ -229,6 +246,7 @@ maxEIBV (ForAllI n ags d f) = maxEIBV f
 maxEIBV (K ag f) = maxEIBV f 
 maxEIBV (KV ag v) = 0 
 maxEIBV (Ann f g) = maxEIBV f `max` maxEIBV g
+maxEIBV (Ann' f g) = maxEIBV f `max` maxEIBV g
 maxEIBV (Box p f) = maxEIBV f 
 
 maxUIBV :: Formula Modal -> Int
@@ -246,6 +264,7 @@ maxUIBV (K ag f) = maxUIBV f
 maxUIBV (KV ag v) = 0 
 maxUIBV (KVe ag v) = 0 
 maxUIBV (Ann f g) = maxUIBV f `max` maxUIBV g
+maxUIBV (Ann' f g) = maxUIBV f `max` maxUIBV g
 maxUIBV (Box p f) = maxUIBV f 
 
 ----------------------------
@@ -348,6 +367,7 @@ subBool x e (Imp f g)       = Imp (subBool x e f) (subBool x e g)
 subBool x e (Equiv f g)     = Equiv (subBool x e f) (subBool x e g)
 subBool x e (K a f)         = K a (subBool x e f)
 subBool x e (Ann f g)       = Ann (subBool x e f) (subBool x e g)
+subBool x e (Ann' f g)       = Ann' (subBool x e f) (subBool x e g)
 subBool x e (Box prog f)    = Box prog (subBool x e f)
 subBool x e (ForAllB n ags f)     = ForAllB n ags (subBool x e f)  
 subBool x e (ExistsB n ags f)     = ExistsB n ags (subBool x e f)  
@@ -372,11 +392,16 @@ subNum x e (K a f)           = K a (subNum x e f)
 subNum x e (KV a v)          = KV a v
 subNum x e (KVe a v)         = KVe a v
 subNum x e (Ann f g)         = Ann (subNum x e f) (subNum x e g)
+subNum x e (Ann' f g)         = Ann' (subNum x e f) (subNum x e g)
 subNum x e (Box prog f)      = Box prog (subNum x e f)  -- no used
-subNum x e (ForAllB n ags f)        = ForAllB n ags (subNum x e f)
-subNum x e (ExistsB n ags f)        = ExistsB n ags (subNum x e f)
-subNum x e (ForAllI n ags d f)      = ForAllI n ags d (subNum x e f)
-subNum x e (ExistsI n ags d f)      = ExistsI n ags d (subNum x e f)
+subNum x e g@(ForAllB n ags f)       | x == uBVar n ags = g 
+                                   | otherwise = ForAllB n ags (subNum x e f)
+subNum x e g@(ExistsB n ags f)     | x == eBVar n ags  = g
+                                | otherwise = ExistsB n ags (subNum x e f)
+subNum x e g@(ForAllI n ags d f) | x == uIVar n ags d = g
+                                 | otherwise = ForAllI n ags d (subNum x e f)
+subNum x e g@(ExistsI n ags d f) | x == eIVar n ags d = g     
+                                 | otherwise = ExistsI n ags d (subNum x e f)
 
 --------------------------------
 -- ** Conversion to string
@@ -430,6 +455,7 @@ precedence Imp{} = 6
 precedence Equiv{} = 5
 precedence K{} = 4 
 precedence Ann{} = 3
+precedence Ann'{} = 3
 precedence Box{} = 2 
 precedence ForAllB{} = 1 
 precedence ExistsB{} = 1 
@@ -457,6 +483,7 @@ toPyStringPrec dCntxt f = bracket unbracketed where
         Atom e -> show e
         K ag p   -> "K_" ++ (show ag) ++ " " ++ recurse p
         Ann f g   -> "[" ++ recurse f ++ "]" ++ recurse g
+        Ann' f g   -> "[" ++ recurse f ++ "]" ++ recurse g
         Neg p   -> "Not(" ++ recurse p ++ ")"
         Conj [] -> "True"
         Disj [] -> "False" 
@@ -486,6 +513,7 @@ toStringPrec dCntxt f = bracket unbracketed where
         Atom e -> show e
         K ag p   -> "K_" ++ (show ag) ++ " " ++ recurse p
         Ann f g   -> "[" ++ recurse f ++ "]" ++ recurse g
+        Ann' f g   -> "[" ++ recurse f ++ "]" ++ recurse g
         Neg p   -> "¬" ++ recurse p
         Conj [] -> "True"
         Disj [] -> "False" 
@@ -530,6 +558,7 @@ instance Varable (Formula t)
       freeVars0 (KVe ag v) = [v] 
       freeVars0 (NegKVe ag v) = [v] 
       freeVars0 (Ann f g) = freeVars0 f ++ freeVars0 g
+      freeVars0 (Ann' f g) = freeVars0 f ++ freeVars0 g
       freeVars0 (Box f g) = freeVars0 f ++ freeVars0 g
       freeVars0 (Box' f g) = freeVars0 f ++ freeVars0 g
       freeVars0 (ForAllB i ags f) = freeVars0 f

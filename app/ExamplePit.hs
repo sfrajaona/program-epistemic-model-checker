@@ -147,8 +147,6 @@ alpha14 = Box swap1 (Neg $ K a (Neg. Atom $ IVal lb ≡ IVal rb))
 --  lc = 2 :: Integer
 --  rc = 5 :: Integer
 
-kv :: Agent -> Var -> ModalFormula
-kv a card = K a (Atom $ IVal card ≡ I 5) ∨ K a (Atom $ IVal card ≡ I 3) ∨ K a (Atom $ IVal card ≡ I 2)
 
 alpha15 = Box swap1 (kv a lb) 
 -- ^ A always knows the value of lb after swap1

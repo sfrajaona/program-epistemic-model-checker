@@ -53,8 +53,8 @@ toSymb ff (Equiv alpha1 alpha2) = (toSymb ff alpha1) .<=> (toSymb ff alpha2)
 -- toSymb ff (ExistsB n f)         = sAny (\z -> toSymb ff (sub (eBVar n) (B z) f)) [True, False]
 toSymb ff (ForAllB n ags f)         = quantifiedBool (\(Forall z) -> (toSymb ff (sub (uBVar n ags) (BSymb z) f)))
 toSymb ff (ExistsB n ags f)         = quantifiedBool (\(Exists z) -> (toSymb ff (sub (eBVar n ags) (BSymb z) f)))
--- toSymb ff (ForAllI n d f)       = sAll (\z -> toSymb ff (sub (uIVar n d) (I z) f)) [(fst d)..(snd d)] 
--- toSymb ff (ExistsI n d f)       = sAny (\z -> toSymb ff (sub (eIVar n d) (I z) f)) [(fst d)..(snd d)]
+-- toSymb ff (ForAllI n ags d f)       = sAll (\z -> toSymb ff (sub (uIVar n d ags) (I z) f)) [(fst d)..(snd d)] 
+-- toSymb ff (ExistsI n ags d f)       = sAny (\z -> toSymb ff (sub (eIVar n d ags) (I z) f)) [(fst d)..(snd d)]
 -- toSymb ff (ForAllI n d f)    = skolemize $ quantifiedBool (\(Forall z) -> (z .< literal (snd d) .&& literal (fst d) .< z) .=>  (toSymb ff (sub (uIVar n d) (ISymb z) f)))
 -- toSymb ff (ExistsI n d f)    = skolemize $ quantifiedBool (\(Exists z) -> (z .< literal (snd d) .&& literal (fst d) .< z) .&&  (toSymb ff (sub (eIVar n d) (ISymb z) f)))
 toSymb ff (ForAllI n ags d f)    = quantifiedBool (\(Forall z) -> (toSymb ff (sub (uIVar n ags d) (ISymb z) f)))
