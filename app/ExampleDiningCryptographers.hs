@@ -79,7 +79,7 @@ progDC = BAssign varx bexprDC
 
 -- | the number of agents
 n :: Int 
-n = 10 
+n = 100 
 
 noonepaid :: ModalFormula 
 noonepaid = Conj [Neg (Atom (p i)) | i <- [0 .. (n-1)]]

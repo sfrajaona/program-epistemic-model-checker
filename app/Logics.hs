@@ -58,12 +58,12 @@ varDomRange :: Var -> [IntType]
 varDomRange (BVar ags a) = [0,1] 
 varDomRange (NVar ags (x,y) a) = [x..y] 
 
-nonObservers :: Var -> [Agent] 
-nonObservers (BVar ags _) = ags 
-nonObservers (NVar ags _ _) = ags 
+varNonObs :: Var -> [Agent] 
+varNonObs (BVar ags _) = ags 
+varNonObs (NVar ags _ _) = ags 
 
 nonObs :: Agent -> ModalFormula -> [Var] 
-nonObs a phi =  (L.nub [v | v <- freeVars phi, a `elem` nonObservers v]) 
+nonObs a phi =  (L.nub [v | v <- freeVars phi, a `elem` varNonObs v]) 
 
 ------------------------------------------------
 -- ** Expressions 
@@ -289,8 +289,8 @@ sp :: ModalFormula -> Prog -> ModalFormula
 -- TODO add sp for new
 sp phi (Assume beta)       = beta ∧ phi
 sp phi (Assert beta)       = beta ⇒ phi
-sp phi (BAssign v e)     = existsB (nonObservers v) (\y -> Conj [Atom (BEq (BVal v) (subBExpr v (BVal y) e)), sub v (BVal y) phi])  
-sp phi (NAssign v e)     = existsI (nonObservers v) (varDom v) (\y -> Conj [Atom (Eq (IVal v) (subNExpr v (IVal y) e)), sub v (IVal y) phi])  
+sp phi (BAssign v e)     = existsB (varNonObs v) (\y -> Conj [Atom (BEq (BVal v) (subBExpr v (BVal y) e)), sub v (BVal y) phi])  
+sp phi (NAssign v e)     = existsI (varNonObs v) (varDom v) (\y -> Conj [Atom (Eq (IVal v) (subNExpr v (IVal y) e)), sub v (IVal y) phi])  
 sp phi (Sequence [])     = phi
 sp phi (Sequence [p])    = sp phi p
 sp phi (Sequence (p:ps)) = sp (sp phi p) (Sequence ps)
@@ -306,8 +306,8 @@ wp alpha (Assume beta)           = Ann beta alpha
 wp alpha (Assert beta)           = beta ∧ Ann beta alpha
 wp alpha (New (NVar ags d v) prog)   = forAllI ags d (\k -> (sub (NVar ags d v) (IVal k) (wp alpha prog)))
 wp alpha (New (BVar ags v) prog)   = forAllB ags (\k -> (sub (BVar ags v) (BVal k) (wp alpha prog)))
-wp alpha (BAssign v e)           = forAllB (nonObservers v) (\k -> (Ann (Atom (BEq (BVal k) e)) (sub v (BVal k) alpha)))
-wp alpha (NAssign v e)           = forAllI (nonObservers v) (varDom v) (\k -> (Ann (Atom (Eq (IVal k) e)) (sub v (IVal k) alpha)))
+wp alpha (BAssign v e)           = forAllB (varNonObs v) (\k -> (Ann (Atom (BEq (BVal k) e)) (sub v (BVal k) alpha)))
+wp alpha (NAssign v e)           = forAllI (varNonObs v) (varDom v) (\k -> (Ann (Atom (Eq (IVal k) e)) (sub v (IVal k) alpha)))
 wp alpha (Sequence [p])           = wp alpha p
 wp alpha (Sequence (p:ps))       = wp (wp alpha (Sequence ps)) p
 wp alpha (Nondet ps)             = Conj [wp alpha p | p <- ps]
@@ -449,8 +449,8 @@ instance Show Prog where
 precedence :: Formula t -> Int
 precedence Atom{} = 10 
 precedence Neg {} = 9
-precedence Conj{} = 8
-precedence Disj{} = 7
+precedence Disj{} = 8
+precedence Conj{} = 7
 precedence Imp{} = 6
 precedence Equiv{} = 5
 precedence K{} = 4 

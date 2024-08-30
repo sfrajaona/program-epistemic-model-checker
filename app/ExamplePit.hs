@@ -86,6 +86,8 @@ phi = Conj [
 -- i.e., it proves whether [[phi]] ⊧_LDK alpha
 -- which correspond to [[phi]] ⊧_FO \tau (phi, alpha) by our main theorem
 pitProve α = prove $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
+pitSat α = sat $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
+pitAllSat α = allSat $ toSBV [la,ra,lb,rb,lc,rc] phi (tau phi α)
 
 ------------ USAGE in GHCI ---------------
 -- Make sure you have installed SBV.
@@ -124,7 +126,7 @@ has ag i = ((Atom $ IVal (left ag) ≡ I i) ∨ (Atom $ IVal (right ag) ≡ I i)
 
 alpha12 = Box swap1 (K b (Atom $ IVal lb ≡ IVal rb))
 -- ^ B can know that lb=rb after swap1
--- ghci> pitProve $ Neg alpha12 
+-- ghci> pitProve $ Neg alpha12        or      ghci> pitSat alpha12
 -- Falsifiable. Counter-example:
 -- la = 3 :: Integer
 -- ra = 2 :: Integer
@@ -138,7 +140,7 @@ alpha13 =Box swap1 ((Atom $ IVal lb ≡ IVal rb) ⇒ (Neg $ K a (Atom $ IVal lb 
 -- Q.E.D
 alpha14 = Box swap1 (Neg $ K a (Neg. Atom $ IVal lb ≡ IVal rb)) 
 -- ^ A can learn that B does not make a corner (lb≠rb) after swap1
--- ghci> pitProve $ alpha14
+-- ghci> pitProve $ alpha14      or     ghci> pitSat $ Box swap1 (K a (Neg. Atom $ IVal lb ≡ IVal rb))
 -- Falsifiable. Counter-example:
 --  la = 3 :: Integer
 --  ra = 2 :: Integer
