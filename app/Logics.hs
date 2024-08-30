@@ -164,7 +164,8 @@ forAllB :: [Agent] -> (Var -> Formula Modal) -> Formula Modal
 forAllB ags f = ForAllB n ags body
   where body = f (uBVar n ags)
         dummy = f (uBVar 0 ags)
-        maxFvs = maximum [varNum "UB" var | var <- freeVars dummy]
+        maxFvs = if fvs == [] then 0 else maximum fvs 
+        fvs = [varNum "UB" var | var <- freeVars dummy]
         n    = (maxUBV body `max` maxFvs) + 1
 
 -- | similar to 'forAllB' but with existential 
@@ -172,7 +173,8 @@ existsB :: [Agent] -> (Var -> Formula Modal) -> Formula Modal
 existsB ags f = ExistsB n ags body
   where body = f (eBVar n ags)
         dummy = f (eBVar 0 ags)
-        maxFvs = maximum [varNum "EB" var | var <- freeVars dummy]
+        maxFvs = if fvs == [] then 0 else maximum fvs
+        fvs = [varNum "EB" var | var <- freeVars dummy]
         n    = (maxEBV body `max` maxFvs) + 1
 
 -- | similar to 'forAllB' but for variables on other domains 
@@ -180,7 +182,8 @@ forAllI :: [Agent] -> IntDomain -> (Var ->  Formula Modal) -> Formula Modal
 forAllI ags dom f = ForAllI n ags dom body
   where body = f (uIVar n ags dom)
         dummy = f (uIVar 0 ags dom)
-        maxFvs = maximum [varNum "UI" var | var <- freeVars dummy]
+        maxFvs = if fvs == [] then 0 else maximum fvs
+        fvs = [varNum "UI" var | var <- freeVars dummy]
         n    = (maxUIBV body `max` maxFvs) + 1
 
 
@@ -193,7 +196,8 @@ existsI :: [Agent] -> IntDomain -> (Var -> Formula Modal) -> Formula Modal
 existsI ags dom f = ExistsI n ags dom body
   where body = f (eIVar n ags dom)
         dummy = f (eIVar 0 ags dom)
-        maxFvs = maximum [varNum "EI" var | var <- freeVars dummy]
+        maxFvs = if fvs == [] then 0 else maximum fvs
+        fvs = [varNum "EI" var | var <- freeVars dummy]
         n    = maxEIBV body + 1
 
 -- Computes the maximum index of bound variables
