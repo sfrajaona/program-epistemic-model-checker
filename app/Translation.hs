@@ -10,7 +10,7 @@ into a \(\mathcal{L}_{FO}\) formula
 See also the companion paper here https://doi.org/10.48550/arXiv.2206.13841
 Maintainer: S.F. Rajaona sfrajaona@gmail.com
 -}
-module Translation (tau, tauSP, mkExists)  where
+module Translation (tau, tauSP, mkExists, mkForAll)  where
 import Logics
 import qualified Data.List as L 
 import Debug.Trace 

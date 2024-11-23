@@ -7,4 +7,4 @@ import ExamplePit
 import Logics 
 
 -- main :: IO ()
-main = cherylsBirthday
+main = partSol

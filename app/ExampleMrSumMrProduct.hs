@@ -12,9 +12,9 @@ import Data.Typeable (typeOf)
 -- AGENTS and VARIABLES --
 --------------------------
 s :: Agent 
-s = Agent "Sum"
+s = Agent "Mr S"
 p :: Agent 
-p = Agent "Product"
+p = Agent "Mr P"
 m :: Var
 m = NVar [s, p] (2,62) ("m")
 n :: Var
@@ -51,14 +51,33 @@ phi = Conj [
             Atom (IVal theProd ≡ (IVal m ⨰ IVal n))
            ]
 
+-- phiL m' n' s' p' = and [
+--             (n' <= m'),
+--             (2 <= n'),
+--             (s' <=  62),
+--             (s' == m' + n'),
+--             (p' == m' * n')
+--            ]
+-- phiLSet = [(m',n',n'+m',n'*m') | n'<- [2 .. 62] , m' <-  [2 .. 62], n'+m' <= 62]
+
 -------------------------------------
 -- Program C, Weakest Precondition --
 -------------------------------------
-sumDK = Neg (KV s m) 
-prodDK = Neg (KV p m)
+sumDK = Neg (KV s theProd) 
+sumK = (KV s theProd) 
+prodDK = Neg (KV p theSum)
+prodK = (KV p theSum)
 sumKprodDK = K s (Neg (KV p m)) 
 pK = (KV p m) 
 sK = (KV s m) 
+
+P : mrP
+s the sum 
+
+-- K_P α <-> ∀ s' m' n' (ϕ[s'/s,m'/m,n'/n] ⇒ α) 
+-- KV_P s <-> ∀ s',m',n' (ϕ[s'/s,m'/m,n'/n]  ⇒ s'=s )
+
+newKV = mkForAll [m,n] $ forAllI [s] (2,62) (\s' -> (sub theSum (IVal s') phi ⇒ Atom (Eq (IVal s') (IVal theSum)))) 
 
 combineDict :: Ord a => [M.Map a b] -> (M.Map a b) 
 combineDict []  = M.empty 
@@ -95,14 +114,26 @@ updatePhi ag ϕ alpha = do
   return $ newPhi
 
 
-phiTwo' = do 
-  phiOne <- updatePhi p phi (Neg (KV p m)) 
-  res <- updatePhi s phiOne (K s (Neg (KV p m)))
-  return $ res 
+partSol = do 
+  -- phiOne <- updatePhi p phi (Neg (KV p m)) 
+  phiOne <- updatePhi p phi (Atom $ IVal theProd ≡ I 52)
+  return $ phiOne
+
+alphaSimple = (Atom $ IVal theProd ≡ I 52)
+
+partSol' = do
+  satSet <- (allSatWith mySolver (toSBV [m, n, theSum, theProd] (phi) (tau phi  prodK))) 
+  let modelNN = getModelDictionaries satSet
+  let phiPart = Disj [Conj [Atom (IVal (char2var i) ≡ I (fromCV (dic M.! i))) | i <- ["m","n", "theProduct", "theSum"]  ] | dic <- modelNN] 
+  return phiPart
+
+theSolution' = do
+  phiTwo <- updatePhi s phi (K s (Neg (KV p m)))
+  -- phiThree <- updatePhi p phiTwo (KV p m) 
+  return phiTwo
 
 theSolution = do
-  phiOne <- updatePhi p phi (Neg (KV p m))
-  phiTwo <- updatePhi s phiOne (K s (Neg (KV p m)))
+  phiTwo <- updatePhi s phi (K s (Neg (KV p m)))
   phiThree <- updatePhi p phiTwo (KV p m) 
   phiFour <- updatePhi p phiThree (KV s m) 
   return phiFour

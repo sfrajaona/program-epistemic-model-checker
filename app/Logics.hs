@@ -416,8 +416,8 @@ instance Show (Formula a) where
 
 instance Show Var where
   -- TODO
-  show (BVar ags a) = a++ show ags
-  show (NVar ags d a) = a++show ags
+  show (BVar ags a) = a -- ++ show ags
+  show (NVar ags d a) = a -- ++show ags
 
 instance Show (Expr a) where
   show (BVal v) = show v
